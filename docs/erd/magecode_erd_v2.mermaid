@@ -1,0 +1,347 @@
+erDiagram
+    %% ═══════════════════════════════════════════
+    %% MAGECODE 2.0 — Entity Relationship Diagram
+    %% Version 2.0 — 18/03/2026
+    %% Updated: SIM Semester-level scope, ordered pairs
+    %% ═══════════════════════════════════════════
+
+    %% ── CORE ENTITIES ──
+
+    users {
+        bigint id PK
+        varchar username UK
+        varchar email UK
+        varchar password
+        varchar first_name
+        varchar last_name
+        varchar student_id UK "nullable"
+        varchar avatar_path "nullable"
+        timestamp email_verified_at "nullable"
+        boolean is_first_time_register "default false"
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    organizations {
+        bigint id PK
+        varchar name
+        text description "nullable"
+        varchar email "nullable"
+        varchar avatar_path "nullable"
+        bigint creator_id FK
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    courses {
+        bigint id PK
+        bigint organization_id FK
+        varchar code "UK per org"
+        varchar name
+        text description "nullable"
+        boolean require_bank_approval "default false"
+        bigint creator_id FK
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    semesters {
+        bigint id PK
+        bigint course_id FK
+        varchar name "UK per course"
+        text description "nullable"
+        varchar publish_mode "default auto"
+        varchar lock_mode "default auto"
+        boolean allow_publish_override "default true"
+        boolean allow_lock_override "default true"
+        decimal similarity_threshold "default 0.70"
+        decimal ai_detection_threshold "default 0.80"
+        date start_date "nullable"
+        date end_date "nullable"
+        bigint creator_id FK
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    sections {
+        bigint id PK
+        bigint semester_id FK
+        varchar name "UK per semester"
+        text description "nullable"
+        bigint creator_id FK
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    problems {
+        bigint id PK
+        bigint section_id FK
+        bigint bank_problem_id FK "nullable"
+        bigint creator_id FK
+        varchar name
+        text description
+        varchar difficulty "default medium"
+        varchar group_label "nullable"
+        integer order "nullable"
+        integer max_submissions "nullable"
+        integer time_limit "ms"
+        integer memory_limit "KB"
+        timestamp activation_time "nullable"
+        timestamp lock_time "nullable"
+        varchar publish_mode_override "nullable"
+        varchar lock_mode_override "nullable"
+        boolean is_published "default false"
+        boolean is_locked "default false"
+        uuid manual_match_group_id "nullable"
+        timestamp testcases_updated_at "nullable"
+        timestamp created_at
+        timestamp updated_at
+        timestamp deleted_at "nullable, soft delete"
+    }
+
+    submissions {
+        bigint id PK
+        bigint problem_id FK
+        bigint creator_id FK
+        bigint programming_language_id FK
+        varchar file_path
+        varchar file_name
+        varchar execution_status "default in_queue"
+        integer testcases_passed "default 0"
+        integer testcases_total "default 0"
+        boolean is_outdated "default false"
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    %% ── TEST CASES & LANGUAGES ──
+
+    test_cases {
+        bigint id PK
+        bigint problem_id FK "CASCADE"
+        text input
+        text expected_output
+        boolean is_active "default true"
+        boolean is_visible "default false"
+        integer order "default 0"
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    programming_languages {
+        bigint id PK
+        varchar name
+        varchar version "nullable"
+        integer judge0_id
+        varchar monaco_language
+        varchar dolos_language "nullable"
+        varchar codeql_language "nullable"
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    %% ── PROBLEM BANK ──
+
+    bank_problems {
+        bigint id PK
+        bigint course_id FK
+        bigint author_id FK
+        bigint original_id FK "nullable, RESTRICT"
+        varchar name
+        text description
+        varchar difficulty "default medium"
+        integer time_limit "ms"
+        integer memory_limit "KB"
+        integer version "default 1"
+        varchar status "default approved"
+        timestamp created_at
+        timestamp updated_at
+        timestamp deleted_at "nullable, soft delete"
+    }
+
+    bank_problem_test_cases {
+        bigint id PK
+        bigint bank_problem_id FK "CASCADE"
+        text input
+        text expected_output
+        boolean is_active "default true"
+        boolean is_visible "default false"
+        integer order "default 0"
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    %% ── ANALYSIS TABLES (SIM = Semester-level scope) ──
+
+    analysis_problems {
+        bigint id PK
+        bigint semester_id FK "scope"
+        bigint bank_problem_id FK "nullable, auto-match"
+        uuid manual_match_group_id "nullable, manual-match"
+        bigint triggered_by_problem_id FK "trace"
+        bigint analyst_id FK
+        jsonb services "enabled list"
+        varchar status "default processing"
+        boolean is_latest "default true"
+        boolean is_partial "default false"
+        timestamp started_at "nullable"
+        timestamp completed_at "nullable"
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    analysis_submissions {
+        bigint id PK
+        bigint submission_id FK
+        bigint analysis_problem_id FK "CASCADE"
+        varchar plagiarism_status "default in_queue"
+        varchar ai_detection_status "default in_queue"
+        varchar vuln_scan_status "default in_queue"
+        timestamp started_at "nullable"
+        timestamp completed_at "nullable"
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    code_execution_results {
+        bigint id PK
+        bigint submission_id FK
+        bigint test_case_id FK
+        varchar status
+        text actual_output "nullable"
+        decimal consumed_time_ms "nullable"
+        integer consumed_memory_kb "nullable"
+        text error_content "nullable"
+        timestamp created_at
+    }
+
+    similarity_results {
+        bigint id PK
+        bigint analysis_problem_id FK "CASCADE"
+        bigint submission_a_id FK "ordered: a < b"
+        bigint submission_b_id FK "ordered: b > a"
+        decimal similarity "0.0000-1.0000"
+        integer longest_fragment "nullable"
+        integer total_overlap "nullable"
+        varchar match_type "WITHIN|CROSS"
+        text a_regions "nullable"
+        text b_regions "nullable"
+        timestamp created_at
+    }
+
+    ai_detection_results {
+        bigint id PK
+        bigint analysis_submission_id FK "CASCADE, UNIQUE"
+        decimal probability "0.0000-1.0000"
+        timestamp created_at
+    }
+
+    vulnerability_results {
+        bigint id PK
+        bigint analysis_submission_id FK "CASCADE"
+        varchar name
+        text description "nullable"
+        varchar severity
+        varchar file_path "nullable"
+        integer start_line "nullable"
+        integer start_column "nullable"
+        integer end_line "nullable"
+        integer end_column "nullable"
+        timestamp created_at
+    }
+
+    %% ── MEMBERSHIP ──
+
+    organization_members {
+        bigint id PK
+        bigint organization_id FK
+        bigint user_id FK "UK per org"
+        varchar role "admin|instructor"
+        bigint added_by FK "nullable"
+        timestamp created_at
+    }
+
+    section_members {
+        bigint id PK
+        bigint section_id FK
+        bigint user_id FK "UK per section"
+        varchar role "instructor|ta|student"
+        bigint added_by FK "nullable"
+        timestamp created_at
+    }
+
+    %% ── TAGS ──
+
+    tags {
+        bigint id PK
+        bigint course_id FK
+        varchar name "UK per course"
+        varchar color "nullable"
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    %% ── AUDIT ──
+
+    problem_edit_logs {
+        bigint id PK
+        bigint problem_id FK
+        bigint edited_by FK
+        varchar field_changed
+        text old_value "nullable"
+        text new_value "nullable"
+        timestamp edited_at
+    }
+
+    section_transfer_logs {
+        bigint id PK
+        bigint user_id FK
+        bigint from_section_id FK
+        bigint to_section_id FK
+        bigint transferred_by FK
+        timestamp transferred_at
+    }
+
+    %% ═══════════════════════════════════
+    %% RELATIONSHIPS
+    %% ═══════════════════════════════════
+
+    organizations ||--o{ courses : "has many"
+    courses ||--o{ semesters : "has many"
+    semesters ||--o{ sections : "has many"
+    sections ||--o{ problems : "has many"
+    problems ||--o{ submissions : "has many"
+    problems ||--o{ test_cases : "has many (CASCADE)"
+
+    courses ||--o{ bank_problems : "has many"
+    bank_problems ||--o{ bank_problem_test_cases : "has many (CASCADE)"
+    bank_problems ||--o{ bank_problems : "versions (original_id)"
+    bank_problems ||--o{ problems : "cloned to"
+
+    courses ||--o{ tags : "has many"
+
+    submissions }o--|| programming_languages : "belongs to"
+
+    %% Analysis — Semester-level scope
+    semesters ||--o{ analysis_problems : "has many"
+    analysis_problems ||--o{ analysis_submissions : "has many (CASCADE)"
+    analysis_problems ||--o{ similarity_results : "has many (CASCADE)"
+    submissions ||--o{ analysis_submissions : "has many"
+    submissions ||--o{ code_execution_results : "has many"
+    analysis_submissions ||--o{ ai_detection_results : "has one"
+    analysis_submissions ||--o{ vulnerability_results : "has many"
+
+    %% Membership
+    organizations ||--o{ organization_members : "has many"
+    sections ||--o{ section_members : "has many"
+    users ||--o{ organization_members : "has many"
+    users ||--o{ section_members : "has many"
+
+    %% Similarity ordered pairs
+    similarity_results }o--|| submissions : "submission_a"
+    similarity_results }o--|| submissions : "submission_b"
+
+    %% User references
+    users ||--o{ submissions : "submits"
+    users ||--o{ problems : "creates"
+    users ||--o{ analysis_problems : "triggers"
