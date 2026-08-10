@@ -257,6 +257,7 @@ Original text is updated inline; this table records what changed and why.
 |---|---|---|---|
 | 2026-08-10 | D-10 | Laravel 12 → 13, PHP 8.3 → 8.4, Go 1.22 → 1.26, Python 3.11 → 3.12 | D-10's rationale is "latest version"; Laravel 13 + PHP 8.4 validated by the deprecated 2.0 prototype. See `docs/superpowers/plans/2026-08-10-magecode-2.0-upgrade-roadmap.md` (U-1) |
 | 2026-08-10 | D-85, D-79c | Pre-signed URL TTL 2h → 6h | `rabbitmq-schemas.md` §2.6 (final Phase 1 deliverable) already specified 6h to cover max queue wait + 30-min analysis timeout + buffer; decision logs and technical-design brought in line (U-4) |
+| 2026-08-10 | D-12 | 4 roles → 5 roles (adds System Admin) | `openapi.yml` already defines System Admin for platform bootstrap (creating Organizations, assigning Org Admins); technical-design §3 and decision logs unified (U-5) |
 
 ---
 

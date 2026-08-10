@@ -137,10 +137,11 @@ All instructors teaching the same Course can see and clone Bank Problems. Publis
 
 ## 4. Roles and Permissions
 
-### 4.1. Four Roles
+### 4.1. Five Roles
 
 | Role | Scope | Key Permissions |
 |---|---|---|
+| **System Admin** | Entire platform | Bootstrap and manage Organizations, assign Org Admins, platform configuration. Operates above the Organization scope |
 | **Organization Admin** | Entire Organization | Manage Courses, full cross-section visibility, set Semester policies, manage Problem Bank |
 | **Instructor** | Assigned Sections | Create/edit Problems, trigger analysis, view submissions in own sections, clone from Problem Bank |
 | **Teaching Assistant** | Assigned Sections | View submissions, assist grading. Optional per Section. Cannot create Problems or trigger analysis (unless Instructor permits) |
@@ -390,7 +391,7 @@ All 33 architectural and design decisions have been finalized. Tech stack is com
 | D-09 | UX navigation | Dashboard per role | Student: 1 click, Instructor: 2 clicks |
 | D-10 | Laravel version | Laravel 13 | Latest version |
 | D-11 | Cost | Open-source, free tier priority | Academic budget constraints |
-| D-12 | Roles | 4: Org Admin, Instructor, TA, Student | Reflects reality |
+| D-12 | Roles | 5: System Admin, Org Admin, Instructor, TA, Student | Reflects reality (amended 2026-08-10) |
 | D-13 | TA | Optional per Section | Not every section has a TA |
 | D-14 | Problem metadata | `group_label` + difficulty (overridable) + time | Group by week, classify difficulty |
 | D-15 | Tags | Course scope, M2M with Bank Problem | Filter/search Problem Bank |
@@ -436,7 +437,7 @@ Five-phase roadmap. Rewrite from zero. Each phase has an independent deliverable
 **Goal:** End-to-end system where students can submit code.
 
 - Setup infrastructure: PostgreSQL + PgBouncer + RabbitMQ + MinIO + Traefik + Docker Compose
-- New api service: Auth, RBAC 4 roles, CRUD entities (Org/Course/Semester/Section/Problem), import students
+- New api service: Auth, RBAC 5 roles, CRUD entities (Org/Course/Semester/Section/Problem), import students
 - New web service: Login, Dashboard per role, CRUD UI
 - New code-executor: Written from zero in Go, Judge0 integration, standardized error handling
 - Submission flow: Submit → Judge0 → real-time results
