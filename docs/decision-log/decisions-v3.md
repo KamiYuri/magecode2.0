@@ -70,7 +70,7 @@ The core change is splitting services into two distinct paths based on their tim
 | **D-82** | Analysis timeout | Polling: scheduled job 5min, timeout 30min, warn 15min. | Simple, sufficient for batch workload, covers crash |
 | **D-83** | Result queues | Split: `result-execution` + `result-analysis`. | Different logic, failure isolation, clean separation |
 | **D-84** | Job message payload | CES: ID only. SIM/AID/VUL: full info + `file_url`. | CES has DB. Others stateless, need all info upfront |
-| **D-85** | MinIO access | Pre-signed URL for SIM/AID/VUL (2h). CES direct. | Stateless services need no MinIO credentials |
+| **D-85** | MinIO access | Pre-signed URL for SIM/AID/VUL (6h). CES direct. | Stateless services need no MinIO credentials |
 | **D-86** | Traefik | Phase 2. Path-based, single domain, nginx+PHP-FPM. | No CORS, auto-discovery, TLS in production |
 | **D-87** | Observability | Full setup Phase 2. Prometheus+Grafana+Loki. | ~600MB RAM, Docker Loki log driver, worth it early |
 | **D-88** | Log format | JSON stdout. Required: timestamp, level, service, message. `trace_id` across services. | Unified query in Loki, cross-service debugging |
@@ -117,7 +117,7 @@ CES receives `submission_id` only and queries DB for test cases, language, and f
 
 ### 4.6. D-85: MinIO Pre-signed URLs
 
-api generates pre-signed URLs with 2-hour expiry and includes them in job messages for SIM/AID/VUL. Services download source code via standard HTTP GET. No MinIO SDK or credentials needed. CES uses direct MinIO access via `shared/go/storage/` package.
+api generates pre-signed URLs with 6-hour expiry and includes them in job messages for SIM/AID/VUL. Services download source code via standard HTTP GET. No MinIO SDK or credentials needed. CES uses direct MinIO access via `shared/go/storage/` package.
 
 **Performance:** Source files are max 50KB (D-34). HTTPS download on internal Docker network takes ~10ms per file. SIM downloading 100+ files sequentially takes ~1 second, negligible compared to Dolos processing time.
 
@@ -256,6 +256,7 @@ Original text is updated inline; this table records what changed and why.
 | Date | Decision(s) | Change | Rationale |
 |---|---|---|---|
 | 2026-08-10 | D-10 | Laravel 12 → 13, PHP 8.3 → 8.4, Go 1.22 → 1.26, Python 3.11 → 3.12 | D-10's rationale is "latest version"; Laravel 13 + PHP 8.4 validated by the deprecated 2.0 prototype. See `docs/superpowers/plans/2026-08-10-magecode-2.0-upgrade-roadmap.md` (U-1) |
+| 2026-08-10 | D-85, D-79c | Pre-signed URL TTL 2h → 6h | `rabbitmq-schemas.md` §2.6 (final Phase 1 deliverable) already specified 6h to cover max queue wait + 30-min analysis timeout + buffer; decision logs and technical-design brought in line (U-4) |
 
 ---
 

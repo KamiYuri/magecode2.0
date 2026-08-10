@@ -640,7 +640,7 @@ All messages use JSON format with persistent delivery mode. Service identifiers 
 }
 ```
 
-> Note: `compared_submissions` includes submissions from other sections in the semester (cross-section comparison). `file_url` values are MinIO pre-signed URLs with 2-hour expiry (D-85).
+> Note: `compared_submissions` includes submissions from other sections in the semester (cross-section comparison). `file_url` values are MinIO pre-signed URLs with 6-hour expiry (D-85).
 
 #### 8.2.3. `ai-detector` queue (D-84: full payload, stateless)
 
@@ -731,7 +731,7 @@ Analysis is triggered manually by Instructor or Org Admin after the problem is l
 2. api creates `analysis_problems` record (Semester-level scope, D-48)
 3. api retrieves the latest submission per student for all equivalent problems in Semester
 4. For each submission, creates `analysis_submission` record
-5. api generates pre-signed MinIO URLs (2h expiry, D-85) and publishes messages to RabbitMQ per selected services:
+5. api generates pre-signed MinIO URLs (6h expiry, D-85) and publishes messages to RabbitMQ per selected services:
    - **SIM:** 1 message with all submission `file_url`s (pairwise comparison across entire Semester)
    - **AID:** 1 message per submission with `file_url`
    - **VUL:** 1 message per submission with `file_url` (if selected)

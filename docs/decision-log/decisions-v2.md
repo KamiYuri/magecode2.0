@@ -90,7 +90,7 @@
 | **D-79** | Network isolation | Internal Docker network for services | Only Traefik exposed externally, all services on `magecode_internal` network |
 | **D-79a** | Docker image strategy | Multi-stage builds, Alpine base for Go | Minimize image size for Go services (~20MB final) |
 | **D-79b** | PHP-FPM tuning | 50 workers for api | `pm.max_children = 50`, transaction pooling via PgBouncer |
-| **D-79c** | MinIO bucket policy | Private buckets, pre-signed URLs for access | 2-hour expiry for analysis services (D-85) |
+| **D-79c** | MinIO bucket policy | Private buckets, pre-signed URLs for access | 6-hour expiry for analysis services (D-85) |
 | **D-79d** | RabbitMQ durability | Durable queues, persistent messages | All queues declared durable, delivery mode = 2 (persistent) |
 | **D-79e** | Error retry strategy | Dead letter queues with 3 retries | DLX per queue, exponential backoff via message TTL |
 
