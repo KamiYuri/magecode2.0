@@ -13,7 +13,7 @@
 | Task | Prio | Status | Ref | Notes |
 |---|---|---|---|---|
 | A1 logger | P0 | done | `ab7f1e5` | slog JSON handler per D-88; tests green (GOWORK=off — go.work still broken until A7) |
-| A2 config | P0 | todo | — | — |
+| A2 config | P0 | done | `5dff1fe` | fail-fast Load(spec) validates presence + coercion up front; getters infallible |
 | A3 apperror | P0 | todo | — | — |
 | A4 rmq | P0 | todo | — | — |
 | A5 db | P0 | todo | — | — |
@@ -124,3 +124,4 @@
 |---|---|---|
 | 2026-08-10 | — | Docs phase complete: design SoT, roadmap, UI/UX spec, session workflow. Code not started. |
 | 2026-08-10 | A1 | done — `shared/go/logger` implemented TDD, 7 tests green, merged to `shared/dev`. Note: `go.work` lists nonexistent `services/*` modules + stale go directive; run shared/go tooling with `GOWORK=off` until A7 fixes it. |
+| 2026-08-10 | A2 | done — `shared/go/config` fail-fast env loader, 8 tests green, merged to `shared/dev`. |
