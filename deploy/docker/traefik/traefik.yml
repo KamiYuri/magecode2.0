@@ -1,0 +1,37 @@
+api:
+  dashboard: true
+  insecure: true
+
+entryPoints:
+  web:
+    address: ":80"
+  websecure:
+    address: ":443"
+  metrics:
+    address: ":8082"
+
+providers:
+  docker:
+    endpoint: "unix:///var/run/docker.sock"
+    exposedByDefault: false
+    network: magecode-frontend
+    watch: true
+  file:
+    directory: /etc/traefik/dynamic
+    watch: true
+
+metrics:
+  prometheus:
+    entryPoint: metrics
+    addEntryPointsLabels: true
+    addServicesLabels: true
+
+accessLog:
+  format: json
+  filters:
+    statusCodes:
+      - "400-599"
+
+log:
+  level: WARN
+  format: json

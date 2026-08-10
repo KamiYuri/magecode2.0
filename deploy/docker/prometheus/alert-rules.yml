@@ -1,0 +1,78 @@
+# MageCode 2.0 — Prometheus Alert Rules (D-87)
+
+groups:
+  - name: magecode-alerts
+    rules:
+      # Service down — container restart >3x in 5min
+      - alert: ServiceHighRestartRate
+        expr: increase(container_restart_count[5m]) > 3
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Service {{ $labels.name }} restarting too frequently"
+          description: "{{ $labels.name }} has restarted {{ $value }} times in 5 minutes"
+
+      # Queue backlog — depth >100 for 10min
+      - alert: RabbitMQQueueBacklog
+        expr: rabbitmq_queue_messages > 100
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Queue {{ $labels.queue }} backlog"
+          description: "Queue {{ $labels.queue }} has {{ $value }} messages for >10min"
+
+      # DB connections — PgBouncer wait_time >5s
+      - alert: PgBouncerHighWaitTime
+        expr: pgbouncer_pools_server_wait_time_seconds > 5
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "PgBouncer high wait time"
+          description: "PgBouncer pool {{ $labels.database }} wait time is {{ $value }}s"
+
+      # PgBouncer pool exhaustion
+      - alert: PgBouncerPoolExhaustion
+        expr: pgbouncer_pools_server_active_connections / pgbouncer_pools_server_max_connections > 0.9
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "PgBouncer pool near exhaustion"
+          description: "Database {{ $labels.database }} pool usage is at {{ $value | humanizePercentage }}"
+
+      # High error rate — >5% 5xx in 5min
+      - alert: HighErrorRate
+        expr: |
+          sum(rate(traefik_service_requests_total{code=~"5.."}[5m]))
+          /
+          sum(rate(traefik_service_requests_total[5m]))
+          > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High HTTP error rate"
+          description: "5xx error rate is {{ $value | humanizePercentage }} over 5 minutes"
+
+      # PostgreSQL connections nearing limit
+      - alert: PostgreSQLHighConnections
+        expr: pg_stat_activity_count / pg_settings_max_connections > 0.8
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "PostgreSQL connections >80%"
+          description: "{{ $value | humanizePercentage }} of max_connections used"
+
+      # RabbitMQ memory alarm
+      - alert: RabbitMQMemoryAlarm
+        expr: rabbitmq_alarms_memory_used_watermark == 1
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "RabbitMQ memory alarm triggered"
+          description: "RabbitMQ has triggered a memory high watermark alarm"

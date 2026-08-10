@@ -1,0 +1,35 @@
+# MageCode 2.0 — Traefik Dynamic Middlewares (D-86)
+
+http:
+  middlewares:
+    # Rate limiting — 100 req/s average, burst 200
+    rate-limit:
+      rateLimit:
+        average: 100
+        burst: 200
+        period: 1s
+
+    # Security headers
+    security-headers:
+      headers:
+        browserXssFilter: true
+        contentTypeNosniff: true
+        frameDeny: true
+        stsIncludeSubdomains: true
+        stsSeconds: 31536000
+        customFrameOptionsValue: "SAMEORIGIN"
+        customResponseHeaders:
+          X-Robots-Tag: "noindex, nofollow"
+          Server: ""
+
+    # Gzip compression
+    compress:
+      compress:
+        excludedContentTypes:
+          - "text/event-stream"
+
+    # Retry on 5xx (idempotent requests only)
+    retry:
+      retry:
+        attempts: 3
+        initialInterval: 100ms
