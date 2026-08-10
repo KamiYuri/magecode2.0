@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "magecode:queue:result-execution:1.0",
+  "title": "CES Result Message",
+  "description": "Signal that CES has finished processing a submission. Results already written to DB by CES (D-81). api uses this to push WebSocket notification to student. Includes execution_status and test case counts so api does not need to query DB.",
+  "type": "object",
+  "required": [
+    "submission_id", "service", "status",
+    "execution_status", "testcases_passed", "testcases_total",
+    "trace_id", "timestamp", "version"
+  ],
+  "properties": {
+    "submission_id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "PK of submissions table"
+    },
+    "service": {
+      "type": "string",
+      "const": "code-executor"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["completed", "error"],
+      "description": "Processing outcome. completed = all test cases processed (pass or fail). error = infrastructure/system error (Judge0 down, DB write failed)."
+    },
+    "execution_status": {
+      "type": "string",
+      "enum": [
+        "accepted", "partially_accepted", "error",
+        "timeout", "language_not_supported"
+      ],
+      "description": "Final submission-level status. Mirrors submissions.execution_status already written to DB by CES."
+    },
+    "testcases_passed": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of test cases with status=accepted"
+    },
+    "testcases_total": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Total test cases executed"
+    },
+    "error_message": {
+      "type": "string",
+      "description": "Error detail when status=error. Optional."
+    },
+    "trace_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Echoed from job message trace_id"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 UTC publish time"
+    },
+    "version": {
+      "type": "string",
+      "const": "1.0"
+    }
+  }
+}

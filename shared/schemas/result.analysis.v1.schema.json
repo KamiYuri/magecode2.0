@@ -1,0 +1,236 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "magecode:queue:result-analysis:1.0",
+  "title": "Analysis Result Message",
+  "description": "Result from SIM/AID/VUL analysis services. api is the single writer — receives full result data and writes to DB (D-80). Format varies by service, discriminated on 'service' field. No additionalProperties restriction on result messages for forward compatibility.",
+  "type": "object",
+  "required": ["service", "status", "trace_id", "timestamp", "version"],
+  "oneOf": [
+    { "$ref": "#/$defs/sim_result" },
+    { "$ref": "#/$defs/aid_result" },
+    { "$ref": "#/$defs/vul_result" }
+  ],
+
+  "$defs": {
+
+    "sim_result": {
+      "title": "SIM (plagiarism-checker) Result",
+      "description": "Pairwise similarity results for one language group within a batch. 1 message per language group. api tracks language_group_index / language_group_total for completion.",
+      "type": "object",
+      "required": [
+        "analysis_problem_id", "service", "status",
+        "language", "language_group_index", "language_group_total",
+        "pairs", "submission_statuses",
+        "trace_id", "timestamp", "version"
+      ],
+      "properties": {
+        "analysis_problem_id": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "PK of analysis_problems table"
+        },
+        "service": {
+          "type": "string",
+          "const": "plagiarism-checker"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["completed", "error"],
+          "description": "Batch-level outcome for this language group"
+        },
+        "error_message": {
+          "type": "string",
+          "description": "Error detail when status=error"
+        },
+        "language": {
+          "type": "string",
+          "enum": ["python", "java", "c", "cpp"],
+          "description": "Echoed from job message. Language of this group."
+        },
+        "language_group_index": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Echoed from job message. 0-based index."
+        },
+        "language_group_total": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Echoed from job message. Total groups for this analysis_problem."
+        },
+        "pairs": {
+          "type": "array",
+          "description": "Pairwise comparison results. Empty array if status=error or no matches found. ORDERED: submission_a_id < submission_b_id always.",
+          "items": {
+            "type": "object",
+            "required": ["submission_a_id", "submission_b_id", "similarity"],
+            "properties": {
+              "submission_a_id": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "First submission in pair (always < submission_b_id)"
+              },
+              "submission_b_id": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Second submission in pair (always > submission_a_id)"
+              },
+              "similarity": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "description": "Similarity score 0.0–1.0"
+              },
+              "longest_fragment": {
+                "type": ["integer", "null"],
+                "minimum": 0,
+                "description": "Longest matching fragment in tokens"
+              },
+              "total_overlap": {
+                "type": ["integer", "null"],
+                "minimum": 0,
+                "description": "Total overlapping tokens"
+              },
+              "a_regions": {
+                "type": ["string", "null"],
+                "description": "Highlight regions for submission A. Pipe-separated format: startRow,startCol,endRow,endCol|startRow,startCol,endRow,endCol|..."
+              },
+              "b_regions": {
+                "type": ["string", "null"],
+                "description": "Highlight regions for submission B. Same pipe-separated format."
+              }
+            }
+          }
+        },
+        "submission_statuses": {
+          "type": "array",
+          "description": "Per-submission processing status within this language group. api uses this to update analysis_submissions.plagiarism_status for each submission.",
+          "items": {
+            "type": "object",
+            "required": ["analysis_submission_id", "status"],
+            "properties": {
+              "analysis_submission_id": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "status": {
+                "type": "string",
+                "enum": ["completed", "error"],
+                "description": "Per-submission outcome within SIM processing"
+              },
+              "error_message": {
+                "type": "string",
+                "description": "Per-submission error detail (e.g. file download failed)"
+              }
+            }
+          }
+        },
+        "trace_id": { "type": "string", "format": "uuid" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "version": { "type": "string", "const": "1.0" }
+      }
+    },
+
+    "aid_result": {
+      "title": "AID (ai-detector) Result",
+      "description": "AI-generated code detection probability for a single submission. 1 message per analysis_submission.",
+      "type": "object",
+      "required": [
+        "analysis_submission_id", "service", "status",
+        "trace_id", "timestamp", "version"
+      ],
+      "properties": {
+        "analysis_submission_id": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "PK of analysis_submissions table"
+        },
+        "service": {
+          "type": "string",
+          "const": "ai-detector"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["completed", "error", "not_applicable"],
+          "description": "not_applicable when language not supported by AID model (currently supports python, java, cpp)"
+        },
+        "error_message": {
+          "type": "string",
+          "description": "Error detail when status=error"
+        },
+        "probability": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "maximum": 1,
+          "description": "AI-generated probability 0.0–1.0. null when status != completed."
+        },
+        "trace_id": { "type": "string", "format": "uuid" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "version": { "type": "string", "const": "1.0" }
+      }
+    },
+
+    "vul_result": {
+      "title": "VUL (vuln-scanner) Result",
+      "description": "CodeQL vulnerability findings for a single submission. 1 message per analysis_submission. May contain 0 or more findings.",
+      "type": "object",
+      "required": [
+        "analysis_submission_id", "service", "status",
+        "trace_id", "timestamp", "version"
+      ],
+      "properties": {
+        "analysis_submission_id": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "PK of analysis_submissions table"
+        },
+        "service": {
+          "type": "string",
+          "const": "vuln-scanner"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["completed", "error", "not_applicable"],
+          "description": "not_applicable when codeql_language is null for this programming language"
+        },
+        "error_message": {
+          "type": "string",
+          "description": "Error detail when status=error"
+        },
+        "findings": {
+          "type": "array",
+          "description": "CodeQL findings. Empty array if code is clean or status != completed.",
+          "items": {
+            "type": "object",
+            "required": ["name", "severity"],
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "CodeQL rule name, e.g. 'py/sql-injection'"
+              },
+              "description": {
+                "type": ["string", "null"],
+                "description": "Human-readable vulnerability description"
+              },
+              "severity": {
+                "type": "string",
+                "enum": ["recommendation", "warning", "error"],
+                "description": "Maps from CodeQL severity levels"
+              },
+              "file_path": {
+                "type": ["string", "null"],
+                "description": "Relative file path where vulnerability was found"
+              },
+              "start_line": { "type": ["integer", "null"], "minimum": 1 },
+              "start_column": { "type": ["integer", "null"], "minimum": 1 },
+              "end_line": { "type": ["integer", "null"], "minimum": 1 },
+              "end_column": { "type": ["integer", "null"], "minimum": 1 }
+            }
+          }
+        },
+        "trace_id": { "type": "string", "format": "uuid" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "version": { "type": "string", "const": "1.0" }
+      }
+    }
+  }
+}
