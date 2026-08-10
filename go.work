@@ -1,0 +1,8 @@
+go 1.26
+
+use (
+	./services/code-executor
+	./services/plagiarism-checker
+	./services/vuln-scanner
+	./shared/go
+)
