@@ -14,7 +14,7 @@
 |---|---|---|---|---|
 | A1 logger | P0 | done | `ab7f1e5` | slog JSON handler per D-88; tests green (GOWORK=off — go.work still broken until A7) |
 | A2 config | P0 | done | `5dff1fe` | fail-fast Load(spec) validates presence + coercion up front; getters infallible |
-| A3 apperror | P0 | todo | — | — |
+| A3 apperror | P0 | wip | `shared/feat/apperror` | — |
 | A4 rmq | P0 | todo | — | — |
 | A5 db | P0 | todo | — | — |
 | A6 storage | P0 | todo | — | — |
