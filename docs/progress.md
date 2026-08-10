@@ -13,7 +13,7 @@
 | Task | Prio | Status | Ref | Notes |
 |---|---|---|---|---|
 | A1 logger | P0 | done | `ab7f1e5` | slog JSON handler per D-88; tests green (GOWORK=off — go.work still broken until A7) |
-| A2 config | P0 | todo | — | — |
+| A2 config | P0 | wip | `shared/feat/config` | — |
 | A3 apperror | P0 | todo | — | — |
 | A4 rmq | P0 | todo | — | — |
 | A5 db | P0 | todo | — | — |
