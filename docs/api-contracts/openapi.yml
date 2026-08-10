@@ -1,0 +1,2596 @@
+openapi: 3.1.0
+info:
+  title: MageCode 2.0 — API Specification
+  version: 2.0.0
+  description: |
+    Complete REST API contracts for MageCode 2.0 for Education.
+    Rewrite from zero — no legacy v1.0 endpoints carried over.
+
+    **v2.0 changelog (26 fixes from self-review):**
+    - 7 logic bugs fixed (submission content-type, test case edit rules, soft delete, bank validation, etc.)
+    - 8 missing endpoints added (section submissions, export, dashboard, reorder, match groups, FTR, WebSocket docs)
+    - 5 schema issues resolved (oneOf submission, hidden test case IDs, notification discriminator, etc.)
+    - 6 design flaws addressed (pagination strategy, include pattern, rate limits, etc.)
+
+    ## Authentication
+    All protected endpoints require `Authorization: Bearer {token}` header.
+    Tokens are issued via Laravel Sanctum on login.
+
+    ## Conventions
+    - **Pagination**: cursor-based for large collections (submissions, members, notifications).
+      Small collections (tags, languages, test cases) return full arrays without pagination.
+    - **Response envelope**: `{ "data": ..., "meta": { ... } }` for paginated lists,
+      `{ "data": [...] }` for small collections, `{ "data": { ... } }` for single resources.
+    - **Errors**: `{ "message": "...", "errors": { "field": ["..."] } }` with appropriate HTTP status.
+    - **Soft-deleted** records are excluded by default. Use `?with_trashed=true` where supported.
+    - **Timestamps**: ISO 8601 UTC (`2026-03-18T10:00:00Z`).
+    - **IDs**: Unsigned BIGINT, returned as integers in JSON.
+    - **Include pattern**: Use `?include=relation1,relation2` on GET endpoints to control eager loading.
+      Default includes vary per endpoint (documented on each). Omit for minimal payload.
+    - **URL convention**: Nested POST for creation (`POST /sections/{id}/problems`),
+      flat GET/PUT/DELETE for single resource (`GET /problems/{id}`). Documented consistently.
+
+    ## Roles (D-12)
+    | Role | Scope | Key Permissions |
+    |------|-------|-----------------|
+    | System Admin | Platform | Create Organizations, manage system |
+    | Org Admin | Organization | Manage Courses, cross-section visibility, policies |
+    | Instructor | Assigned Sections | CRUD Problems, trigger analysis, view section results |
+    | TA | Assigned Sections | View submissions, CES results only (no analysis results) |
+    | Student | Own Section | Submit code, view own results |
+
+    ## Rate Limits
+    | Scope | Limit | Window |
+    |-------|-------|--------|
+    | Global (authenticated) | 120 requests | per minute |
+    | Submission create | 10 requests | per minute per student |
+    | Analysis trigger | 5 requests | per minute per user |
+    | File upload (avatar, import) | 10 requests | per minute |
+    | Auth (login/register) | 10 requests | per minute per IP |
+
+    ## WebSocket Channels (Laravel Reverb)
+    Real-time updates via Pusher-compatible WebSocket protocol.
+    | Channel | Event | Payload | Who Receives |
+    |---------|-------|---------|--------------|
+    | `private-submission.{submission_id}` | `execution.updated` | `{ submission_id, status, testcases_passed, testcases_total, latest_result: CodeExecutionResult }` | Submission creator |
+    | `private-submission.{submission_id}` | `execution.completed` | `{ submission_id, final_status, testcases_passed, testcases_total }` | Submission creator |
+    | `private-section.{section_id}` | `analysis.progress` | `{ analysis_problem_id, completed_count, total_count }` | Section instructors |
+    | `private-section.{section_id}` | `analysis.completed` | `{ analysis_problem_id, status }` | Section instructors |
+
+    ## Error Codes
+    | HTTP | Meaning |
+    |------|---------|
+    | 400 | Bad request |
+    | 401 | Unauthenticated |
+    | 403 | Forbidden (insufficient role) |
+    | 404 | Resource not found |
+    | 409 | Conflict (e.g., duplicate, last admin) |
+    | 422 | Unprocessable (business rule violation) |
+    | 429 | Rate limited |
+  contact:
+    name: BKCS — Hanoi University of Science and Technology
+    email: magecode.dev@gmail.com
+  license:
+    name: Proprietary
+    identifier: LicenseRef-BKCS
+
+servers:
+  - url: /api/v1
+    description: MageCode 2.0 API (behind Traefik)
+
+tags:
+  - name: Auth
+    description: Authentication — register, login, password reset, email verification, first-time register
+  - name: Profile
+    description: Current user profile management
+  - name: Dashboard
+    description: Role-specific dashboard endpoints — quick access without deep navigation
+  - name: Organizations
+    description: Top-level organizational units (BKCS, SoICT)
+  - name: Courses
+    description: Courses within an Organization (IT3080, IT4062)
+  - name: Semesters
+    description: Specific runs of a Course (IT3080-20252)
+  - name: Sections
+    description: Classes within a Semester (L01, L02) — primary isolation boundary
+  - name: Section Members
+    description: Enrollment management — students, instructors, TAs
+  - name: Problems
+    description: Coding problems assigned to Sections
+  - name: Test Cases
+    description: Test cases for Problems
+  - name: Submissions
+    description: Student code submissions and execution results
+  - name: Analysis
+    description: Batch analysis — SIM (plagiarism), AID (AI detection), VUL (vulnerability)
+  - name: Analysis Results
+    description: Viewing analysis results — similarity, AI detection, vulnerability
+  - name: Problem Bank
+    description: Reusable problem repository per Course (fork model, versioned)
+  - name: Tags
+    description: Course-scoped tags for Problem Bank
+  - name: Programming Languages
+    description: Reference data — supported programming languages
+  - name: Notifications
+    description: In-app notifications
+  - name: Export
+    description: Data export — grades, submissions, analysis results
+  - name: System Admin
+    description: Platform administration (seeded admin only)
+
+security:
+  - BearerAuth: []
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Sanctum
+
+  parameters:
+    PathOrganizationId:
+      name: organization_id
+      in: path
+      required: true
+      schema: { type: integer, format: int64 }
+    PathCourseId:
+      name: course_id
+      in: path
+      required: true
+      schema: { type: integer, format: int64 }
+    PathSemesterId:
+      name: semester_id
+      in: path
+      required: true
+      schema: { type: integer, format: int64 }
+    PathSectionId:
+      name: section_id
+      in: path
+      required: true
+      schema: { type: integer, format: int64 }
+    PathProblemId:
+      name: problem_id
+      in: path
+      required: true
+      schema: { type: integer, format: int64 }
+    PathSubmissionId:
+      name: submission_id
+      in: path
+      required: true
+      schema: { type: integer, format: int64 }
+    PathAnalysisProblemId:
+      name: analysis_problem_id
+      in: path
+      required: true
+      schema: { type: integer, format: int64 }
+    PathBankProblemId:
+      name: bank_problem_id
+      in: path
+      required: true
+      schema: { type: integer, format: int64 }
+    PathTagId:
+      name: tag_id
+      in: path
+      required: true
+      schema: { type: integer, format: int64 }
+    PathMemberId:
+      name: member_id
+      in: path
+      required: true
+      schema: { type: integer, format: int64 }
+    QueryCursor:
+      name: cursor
+      in: query
+      required: false
+      schema: { type: string }
+      description: Cursor for pagination. Omit for first page.
+    QueryPerPage:
+      name: per_page
+      in: query
+      required: false
+      schema: { type: integer, default: 20, minimum: 1, maximum: 100 }
+    QueryInclude:
+      name: include
+      in: query
+      required: false
+      schema: { type: string }
+      description: "Comma-separated relations to include. Available values vary per endpoint."
+
+  responses:
+    Unauthenticated:
+      description: Missing or invalid Bearer token
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Forbidden:
+      description: Insufficient permissions
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    ValidationError:
+      description: Validation failed
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ValidationError' }
+    Conflict:
+      description: Conflict (e.g., duplicate entry, last admin)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NoContent:
+      description: Success — no content returned
+    RateLimited:
+      description: Too many requests
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
+  schemas:
+    # ── Generic ──
+    Error:
+      type: object
+      properties:
+        message: { type: string, example: "Resource not found." }
+        code: { type: string, nullable: true, example: "LAST_ADMIN", description: "Machine-readable error code for specific business rules" }
+    ValidationError:
+      type: object
+      properties:
+        message: { type: string, example: "The given data was invalid." }
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items: { type: string }
+          example: { email: ["The email field is required."] }
+    CursorMeta:
+      type: object
+      properties:
+        next_cursor: { type: string, nullable: true }
+        prev_cursor: { type: string, nullable: true }
+        per_page: { type: integer }
+        has_more: { type: boolean }
+    Timestamp:
+      type: string
+      format: date-time
+      example: "2026-03-18T10:00:00Z"
+
+    # ── Auth ──
+    LoginRequest:
+      type: object
+      required: [login, password]
+      properties:
+        login: { type: string, description: "Username or email" }
+        password: { type: string, format: password }
+    LoginResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            token: { type: string }
+            user: { $ref: '#/components/schemas/User' }
+    RegisterRequest:
+      type: object
+      required: [username, email, password, password_confirmation, first_name, last_name]
+      properties:
+        username: { type: string, minLength: 3, maxLength: 50 }
+        email: { type: string, format: email }
+        password: { type: string, format: password, minLength: 8 }
+        password_confirmation: { type: string, format: password }
+        first_name: { type: string, maxLength: 100 }
+        last_name: { type: string, maxLength: 100 }
+        student_id: { type: string, maxLength: 20, nullable: true }
+    ForgotPasswordRequest:
+      type: object
+      required: [email]
+      properties:
+        email: { type: string, format: email }
+    ResetPasswordRequest:
+      type: object
+      required: [email, token, password, password_confirmation]
+      properties:
+        email: { type: string, format: email }
+        token: { type: string }
+        password: { type: string, format: password, minLength: 8 }
+        password_confirmation: { type: string, format: password }
+    FirstTimeSetupRequest:
+      type: object
+      required: [password, password_confirmation]
+      properties:
+        password: { type: string, format: password, minLength: 8, description: "New password replacing the auto-generated one" }
+        password_confirmation: { type: string, format: password }
+        first_name: { type: string, maxLength: 100, description: "Optional override" }
+        last_name: { type: string, maxLength: 100 }
+
+    # ── User / Profile ──
+    User:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        username: { type: string }
+        email: { type: string, format: email }
+        first_name: { type: string }
+        last_name: { type: string }
+        student_id: { type: string, nullable: true }
+        avatar_url: { type: string, nullable: true, description: "Pre-signed MinIO URL" }
+        email_verified_at: { type: string, format: date-time, nullable: true }
+        is_first_time_register: { type: boolean }
+        created_at: { $ref: '#/components/schemas/Timestamp' }
+    UserSummary:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        username: { type: string }
+        first_name: { type: string }
+        last_name: { type: string }
+        student_id: { type: string, nullable: true }
+        avatar_url: { type: string, nullable: true }
+    UpdateProfileRequest:
+      type: object
+      properties:
+        first_name: { type: string, maxLength: 100 }
+        last_name: { type: string, maxLength: 100 }
+        student_id: { type: string, maxLength: 20, nullable: true }
+    ChangePasswordRequest:
+      type: object
+      required: [current_password, password, password_confirmation]
+      properties:
+        current_password: { type: string, format: password }
+        password: { type: string, format: password, minLength: 8 }
+        password_confirmation: { type: string, format: password }
+
+    # ── Dashboard ── [NEW: Missing 3]
+    MySection:
+      type: object
+      description: "Section with context for dashboard display"
+      properties:
+        section: { $ref: '#/components/schemas/Section' }
+        course_code: { type: string, example: "IT3080" }
+        course_name: { type: string }
+        semester_name: { type: string, example: "20252" }
+        organization_name: { type: string }
+        problems_count: { type: integer }
+        my_solved_count: { type: integer, nullable: true, description: "Student: problems with accepted submission" }
+        pending_submissions: { type: integer, nullable: true, description: "Student: submissions still processing" }
+
+    # ── Organization ──
+    Organization:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
+        description: { type: string, nullable: true }
+        email: { type: string, nullable: true }
+        avatar_url: { type: string, nullable: true }
+        creator: { $ref: '#/components/schemas/UserSummary' }
+        my_role: { type: string, enum: [admin, instructor], nullable: true }
+        members_count: { type: integer }
+        courses_count: { type: integer }
+        created_at: { $ref: '#/components/schemas/Timestamp' }
+        updated_at: { $ref: '#/components/schemas/Timestamp' }
+    CreateOrganizationRequest:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, maxLength: 255 }
+        description: { type: string, nullable: true }
+        email: { type: string, format: email, nullable: true }
+    UpdateOrganizationRequest:
+      type: object
+      properties:
+        name: { type: string, maxLength: 255 }
+        description: { type: string, nullable: true }
+        email: { type: string, format: email, nullable: true }
+    OrganizationMember:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        user: { $ref: '#/components/schemas/UserSummary' }
+        role: { type: string, enum: [admin, instructor] }
+        added_by: { $ref: '#/components/schemas/UserSummary' }
+        created_at: { $ref: '#/components/schemas/Timestamp' }
+    AddOrgMembersRequest:
+      type: object
+      required: [members]
+      properties:
+        members:
+          type: array
+          items:
+            type: object
+            required: [email, role]
+            properties:
+              email: { type: string, format: email }
+              role: { type: string, enum: [admin, instructor] }
+
+    # ── Course ──
+    Course:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        organization_id: { type: integer, format: int64 }
+        code: { type: string }
+        name: { type: string }
+        description: { type: string, nullable: true }
+        require_bank_approval: { type: boolean }
+        creator: { $ref: '#/components/schemas/UserSummary' }
+        semesters_count: { type: integer }
+        created_at: { $ref: '#/components/schemas/Timestamp' }
+        updated_at: { $ref: '#/components/schemas/Timestamp' }
+    CreateCourseRequest:
+      type: object
+      required: [code, name]
+      properties:
+        code: { type: string, maxLength: 20 }
+        name: { type: string, maxLength: 255 }
+        description: { type: string, nullable: true }
+        require_bank_approval: { type: boolean, default: false }
+    UpdateCourseRequest:
+      type: object
+      properties:
+        name: { type: string, maxLength: 255 }
+        description: { type: string, nullable: true }
+        require_bank_approval: { type: boolean }
+
+    # ── Semester ──
+    Semester:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        course_id: { type: integer, format: int64 }
+        name: { type: string }
+        description: { type: string, nullable: true }
+        publish_mode: { type: string, enum: [auto, manual] }
+        lock_mode: { type: string, enum: [auto, manual] }
+        allow_publish_override: { type: boolean }
+        allow_lock_override: { type: boolean }
+        similarity_threshold: { type: number, format: decimal }
+        ai_detection_threshold: { type: number, format: decimal }
+        start_date: { type: string, format: date, nullable: true }
+        end_date: { type: string, format: date, nullable: true }
+        creator: { $ref: '#/components/schemas/UserSummary' }
+        sections_count: { type: integer }
+        created_at: { $ref: '#/components/schemas/Timestamp' }
+        updated_at: { $ref: '#/components/schemas/Timestamp' }
+    CreateSemesterRequest:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, maxLength: 100 }
+        description: { type: string, nullable: true }
+        publish_mode: { type: string, enum: [auto, manual], default: "auto" }
+        lock_mode: { type: string, enum: [auto, manual], default: "auto" }
+        allow_publish_override: { type: boolean, default: true }
+        allow_lock_override: { type: boolean, default: true }
+        similarity_threshold: { type: number, minimum: 0, maximum: 1, default: 0.70 }
+        ai_detection_threshold: { type: number, minimum: 0, maximum: 1, default: 0.80 }
+        start_date: { type: string, format: date, nullable: true }
+        end_date: { type: string, format: date, nullable: true }
+    UpdateSemesterRequest:
+      type: object
+      properties:
+        name: { type: string, maxLength: 100 }
+        description: { type: string, nullable: true }
+        publish_mode: { type: string, enum: [auto, manual] }
+        lock_mode: { type: string, enum: [auto, manual] }
+        allow_publish_override: { type: boolean }
+        allow_lock_override: { type: boolean }
+        similarity_threshold: { type: number, minimum: 0, maximum: 1 }
+        ai_detection_threshold: { type: number, minimum: 0, maximum: 1 }
+        start_date: { type: string, format: date, nullable: true }
+        end_date: { type: string, format: date, nullable: true }
+
+    # ── Section ──
+    Section:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        semester_id: { type: integer, format: int64 }
+        name: { type: string }
+        description: { type: string, nullable: true }
+        creator: { $ref: '#/components/schemas/UserSummary' }
+        my_role: { type: string, enum: [instructor, ta, student], nullable: true }
+        members_count: { type: integer }
+        problems_count: { type: integer }
+        created_at: { $ref: '#/components/schemas/Timestamp' }
+        updated_at: { $ref: '#/components/schemas/Timestamp' }
+    CreateSectionRequest:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, maxLength: 50 }
+        description: { type: string, nullable: true }
+    UpdateSectionRequest:
+      type: object
+      properties:
+        name: { type: string, maxLength: 50 }
+        description: { type: string, nullable: true }
+    SectionMember:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        user: { $ref: '#/components/schemas/UserSummary' }
+        role: { type: string, enum: [instructor, ta, student] }
+        added_by: { $ref: '#/components/schemas/UserSummary' }
+        created_at: { $ref: '#/components/schemas/Timestamp' }
+    AddSectionMembersRequest:
+      type: object
+      required: [members]
+      properties:
+        members:
+          type: array
+          items:
+            type: object
+            required: [email, role]
+            properties:
+              email: { type: string, format: email }
+              role: { type: string, enum: [instructor, ta, student] }
+    TransferStudentRequest:
+      type: object
+      required: [to_section_id]
+      properties:
+        to_section_id: { type: integer, format: int64 }
+
+    # ── Problem ──
+    Problem:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        section_id: { type: integer, format: int64 }
+        bank_problem_id: { type: integer, format: int64, nullable: true }
+        creator: { $ref: '#/components/schemas/UserSummary' }
+        name: { type: string }
+        description: { type: string }
+        difficulty: { type: string, enum: [easy, medium, hard] }
+        group_label: { type: string, nullable: true }
+        order: { type: integer, nullable: true }
+        max_submissions: { type: integer, nullable: true }
+        time_limit: { type: integer, description: "ms" }
+        memory_limit: { type: integer, description: "KB" }
+        activation_time: { type: string, format: date-time, nullable: true }
+        lock_time: { type: string, format: date-time, nullable: true }
+        publish_mode_override: { type: string, enum: [auto, manual], nullable: true }
+        lock_mode_override: { type: string, enum: [auto, manual], nullable: true }
+        is_published: { type: boolean }
+        is_locked: { type: boolean }
+        is_visible: { type: boolean, description: "Computed: students can see now" }
+        is_submittable: { type: boolean, description: "Computed: students can submit now" }
+        has_submissions: { type: boolean, description: "Whether any submissions exist" }
+        programming_languages:
+          type: array
+          items: { $ref: '#/components/schemas/ProgrammingLanguage' }
+        tags:
+          type: array
+          items: { $ref: '#/components/schemas/Tag' }
+        submissions_count: { type: integer }
+        my_submissions_count: { type: integer, nullable: true }
+        my_best_status: { type: string, nullable: true }
+        sample_test_cases:
+          type: array
+          items: { $ref: '#/components/schemas/TestCase' }
+          description: "Only visible test cases (is_visible=true)"
+        created_at: { $ref: '#/components/schemas/Timestamp' }
+        updated_at: { $ref: '#/components/schemas/Timestamp' }
+    ProblemDetail:
+      description: "Extended Problem with all test cases and match config (Instructor/OrgAdmin only)"
+      allOf:
+        - $ref: '#/components/schemas/Problem'
+        - type: object
+          properties:
+            test_cases:
+              type: array
+              items: { $ref: '#/components/schemas/TestCase' }
+            manual_match_group_id: { type: string, format: uuid, nullable: true }
+            testcases_updated_at: { type: string, format: date-time, nullable: true }
+            edit_rules:
+              type: object
+              description: "Tells frontend which fields are currently editable"
+              properties:
+                can_edit_description: { type: boolean, description: "Always true for Instructor" }
+                can_edit_test_cases: { type: boolean, description: "False when Problem is locked" }
+                can_edit_limits: { type: boolean, description: "False when Problem is locked" }
+                can_edit_languages: { type: boolean, description: "False when Problem is locked" }
+                can_publish: { type: boolean, description: "Based on semester allow_publish_override" }
+                can_lock: { type: boolean, description: "Based on semester allow_lock_override" }
+    CreateProblemRequest:
+      type: object
+      required: [name, description, time_limit, memory_limit, programming_language_ids]
+      properties:
+        name: { type: string, maxLength: 255 }
+        description: { type: string }
+        difficulty: { type: string, enum: [easy, medium, hard], default: "medium" }
+        group_label: { type: string, maxLength: 100, nullable: true }
+        order: { type: integer, nullable: true }
+        max_submissions: { type: integer, nullable: true, minimum: 1 }
+        time_limit: { type: integer, minimum: 100, maximum: 30000 }
+        memory_limit: { type: integer, minimum: 1024, maximum: 524288 }
+        activation_time: { type: string, format: date-time, nullable: true }
+        lock_time: { type: string, format: date-time, nullable: true }
+        publish_mode_override: { type: string, enum: [auto, manual], nullable: true }
+        lock_mode_override: { type: string, enum: [auto, manual], nullable: true }
+        programming_language_ids:
+          type: array
+          items: { type: integer, format: int64 }
+          minItems: 1
+        tag_ids:
+          type: array
+          items: { type: integer, format: int64 }
+        test_cases:
+          type: array
+          items: { $ref: '#/components/schemas/CreateTestCaseInput' }
+    UpdateProblemRequest:
+      type: object
+      description: |
+        **Edit rules (Q-25, Q-26 resolved):**
+        - Description, name, difficulty, group_label, order, max_submissions, activation_time,
+          lock_time, publish/lock overrides: editable anytime by Instructor/OrgAdmin.
+        - test_cases, time_limit, memory_limit, programming_language_ids (core fields):
+          ONLY editable when Problem is NOT locked. If edited while submissions exist,
+          all existing submissions are flagged `is_outdated=true` and notifications sent
+          to affected students (D-41).
+        - Returns 422 with code `PROBLEM_LOCKED` if attempting to edit core fields on locked problem.
+      properties:
+        name: { type: string, maxLength: 255 }
+        description: { type: string }
+        difficulty: { type: string, enum: [easy, medium, hard] }
+        group_label: { type: string, maxLength: 100, nullable: true }
+        order: { type: integer, nullable: true }
+        max_submissions: { type: integer, nullable: true, minimum: 1 }
+        time_limit: { type: integer, minimum: 100, maximum: 30000 }
+        memory_limit: { type: integer, minimum: 1024, maximum: 524288 }
+        activation_time: { type: string, format: date-time, nullable: true }
+        lock_time: { type: string, format: date-time, nullable: true }
+        publish_mode_override: { type: string, enum: [auto, manual], nullable: true }
+        lock_mode_override: { type: string, enum: [auto, manual], nullable: true }
+        programming_language_ids:
+          type: array
+          items: { type: integer, format: int64 }
+          minItems: 1
+        tag_ids:
+          type: array
+          items: { type: integer, format: int64 }
+    CloneFromBankRequest:
+      type: object
+      required: [bank_problem_id]
+      description: |
+        bank_problem_id MUST belong to the same Course as the Section's parent Semester.
+        Returns 422 with code `BANK_COURSE_MISMATCH` if violated.
+      properties:
+        bank_problem_id: { type: integer, format: int64 }
+        group_label: { type: string, nullable: true }
+        order: { type: integer, nullable: true }
+        activation_time: { type: string, format: date-time, nullable: true }
+        lock_time: { type: string, format: date-time, nullable: true }
+    ReorderProblemsRequest:
+      type: object
+      required: [order]
+      properties:
+        order:
+          type: array
+          description: "Array of {problem_id, order, group_label} in desired order"
+          items:
+            type: object
+            required: [problem_id, order]
+            properties:
+              problem_id: { type: integer, format: int64 }
+              order: { type: integer }
+              group_label: { type: string, nullable: true }
+    SetMatchGroupRequest:
+      type: object
+      required: [problem_ids]
+      description: |
+        Link problems across sections for cross-section SIM comparison.
+        Only needed when problems were NOT cloned from the same bank_problem_id.
+        All problems must be in the same Semester. Generates a shared UUID.
+      properties:
+        problem_ids:
+          type: array
+          items: { type: integer, format: int64 }
+          minItems: 2
+
+    # ── Test Cases ──
+    TestCase:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        input: { type: string }
+        expected_output: { type: string }
+        is_active: { type: boolean }
+        is_visible: { type: boolean }
+        order: { type: integer }
+    CreateTestCaseInput:
+      type: object
+      required: [input, expected_output]
+      properties:
+        input: { type: string }
+        expected_output: { type: string }
+        is_active: { type: boolean, default: true }
+        is_visible: { type: boolean, default: false }
+        order: { type: integer, default: 0 }
+    BatchUpdateTestCasesRequest:
+      type: object
+      required: [test_cases]
+      properties:
+        test_cases:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: integer, format: int64, nullable: true, description: "null = create new" }
+              input: { type: string }
+              expected_output: { type: string }
+              is_active: { type: boolean, default: true }
+              is_visible: { type: boolean, default: false }
+              order: { type: integer, default: 0 }
+              _delete: { type: boolean, default: false }
+
+    # ── Submission ── [FIX: Bug 1 — split into 2 request types]
+    Submission:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        problem_id: { type: integer, format: int64 }
+        creator: { $ref: '#/components/schemas/UserSummary' }
+        programming_language: { $ref: '#/components/schemas/ProgrammingLanguage' }
+        file_name: { type: string }
+        execution_status:
+          type: string
+          enum: [in_queue, processing, accepted, partially_accepted, error, timeout, language_not_supported]
+        testcases_passed: { type: integer }
+        testcases_total: { type: integer }
+        is_outdated: { type: boolean }
+        created_at: { $ref: '#/components/schemas/Timestamp' }
+    SubmissionDetail:
+      allOf:
+        - $ref: '#/components/schemas/Submission'
+        - type: object
+          properties:
+            source_code: { type: string, nullable: true }
+            execution_results:
+              type: array
+              items: { $ref: '#/components/schemas/CodeExecutionResult' }
+    SubmitCodeRequest:
+      type: object
+      required: [programming_language_id, source_code]
+      description: "Submit via Monaco editor (JSON body)"
+      properties:
+        programming_language_id: { type: integer, format: int64 }
+        source_code: { type: string, maxLength: 1048576, description: "Max 1MB (D-33)" }
+    SubmitFileRequest:
+      type: object
+      required: [programming_language_id, file]
+      description: "Submit via file upload (multipart)"
+      properties:
+        programming_language_id: { type: integer, format: int64 }
+        file:
+          type: string
+          format: binary
+          description: "Source code file, max 1MB (D-33)"
+    CodeExecutionResult:
+      type: object
+      description: |
+        Per-test-case result. For Students: test_case_id is omitted for hidden test cases
+        (only order shown). For Instructors: all fields visible.
+      properties:
+        id: { type: integer, format: int64 }
+        test_case_order: { type: integer }
+        is_visible: { type: boolean, description: "Whether this test case is visible to students" }
+        test_case_input: { type: string, nullable: true, description: "Only if is_visible=true or requester is Instructor" }
+        test_case_expected_output: { type: string, nullable: true, description: "Only if is_visible=true or requester is Instructor" }
+        status:
+          type: string
+          enum: [accepted, wrong_answer, time_limit_exceeded, memory_limit_exceeded, runtime_error, compilation_error, internal_error, timeout]
+        actual_output: { type: string, nullable: true }
+        consumed_time_ms: { type: number, nullable: true }
+        consumed_memory_kb: { type: integer, nullable: true }
+        error_content: { type: string, nullable: true, description: "Truncated 5000 chars (D-38)" }
+
+    # ── Analysis ──
+    AnalysisProblem:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        semester_id: { type: integer, format: int64 }
+        triggered_by_problem_id: { type: integer, format: int64 }
+        analyst: { $ref: '#/components/schemas/UserSummary' }
+        services:
+          type: array
+          items:
+            type: string
+            enum: [plagiarism-checker, ai-detector, vuln-scanner]
+        status: { type: string, enum: [processing, completed, timeout] }
+        is_latest: { type: boolean }
+        is_partial: { type: boolean }
+        submissions_count: { type: integer }
+        completed_count: { type: integer }
+        progress_percent: { type: integer, description: "0-100, computed from completed/total" }
+        started_at: { type: string, format: date-time, nullable: true }
+        completed_at: { type: string, format: date-time, nullable: true }
+        created_at: { $ref: '#/components/schemas/Timestamp' }
+    TriggerAnalysisRequest:
+      type: object
+      required: [services]
+      description: |
+        Triggers Semester-scoped analysis. If another batch is currently `processing`
+        for the same scope, returns 409 with code `ANALYSIS_IN_PROGRESS` and includes
+        the existing analysis_problem_id. User can wait or cancel-and-retry via
+        `POST /analysis/{id}/cancel` then re-trigger.
+      properties:
+        services:
+          type: array
+          items:
+            type: string
+            enum: [plagiarism-checker, ai-detector, vuln-scanner]
+          minItems: 1
+    AnalysisSubmission:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        submission: { $ref: '#/components/schemas/Submission' }
+        student: { $ref: '#/components/schemas/UserSummary' }
+        section_id: { type: integer, format: int64 }
+        section_name: { type: string }
+        plagiarism_status:
+          type: string
+          enum: [in_queue, processing, completed, error, timeout, not_applicable]
+        ai_detection_status:
+          type: string
+          enum: [in_queue, processing, completed, error, timeout, not_applicable]
+        vuln_scan_status:
+          type: string
+          enum: [in_queue, processing, completed, error, timeout, not_applicable]
+        ai_detection_probability: { type: number, nullable: true }
+        ai_detection_flagged: { type: boolean, nullable: true }
+        vulnerability_count: { type: integer, nullable: true }
+        source_code: { type: string, nullable: true, description: "Included when ?include=source_code" }
+    SimilarityResult:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        submission_a:
+          type: object
+          properties:
+            id: { type: integer, format: int64 }
+            student: { $ref: '#/components/schemas/UserSummary' }
+            section_id: { type: integer, format: int64 }
+            section_name: { type: string }
+        submission_b:
+          type: object
+          properties:
+            id: { type: integer, format: int64 }
+            student: { $ref: '#/components/schemas/UserSummary' }
+            section_id: { type: integer, format: int64 }
+            section_name: { type: string }
+        similarity: { type: number }
+        longest_fragment: { type: integer, nullable: true }
+        total_overlap: { type: integer, nullable: true }
+        match_type: { type: string, enum: [WITHIN_SECTION, CROSS_SECTION] }
+        flagged: { type: boolean }
+    SimilarityResultDetail:
+      allOf:
+        - $ref: '#/components/schemas/SimilarityResult'
+        - type: object
+          properties:
+            a_source_code: { type: string, nullable: true, description: "Within-section or Org Admin: both sides. Cross-section GV: only own section's code." }
+            b_source_code: { type: string, nullable: true }
+            a_regions: { type: string, nullable: true }
+            b_regions: { type: string, nullable: true }
+    AiDetectionResult:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        analysis_submission_id: { type: integer, format: int64 }
+        student: { $ref: '#/components/schemas/UserSummary' }
+        section_name: { type: string }
+        probability: { type: number }
+        flagged: { type: boolean }
+    VulnerabilityResult:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        analysis_submission_id: { type: integer, format: int64 }
+        name: { type: string }
+        description: { type: string, nullable: true }
+        severity: { type: string, enum: [recommendation, warning, error] }
+        file_path: { type: string, nullable: true }
+        start_line: { type: integer, nullable: true }
+        start_column: { type: integer, nullable: true }
+        end_line: { type: integer, nullable: true }
+        end_column: { type: integer, nullable: true }
+
+    # ── Problem Bank ──
+    BankProblem:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        course_id: { type: integer, format: int64 }
+        author: { $ref: '#/components/schemas/UserSummary' }
+        original_id: { type: integer, format: int64, nullable: true }
+        name: { type: string }
+        description: { type: string }
+        difficulty: { type: string, enum: [easy, medium, hard] }
+        time_limit: { type: integer }
+        memory_limit: { type: integer }
+        version: { type: integer }
+        status: { type: string, enum: [pending, approved, rejected] }
+        programming_languages:
+          type: array
+          items: { $ref: '#/components/schemas/ProgrammingLanguage' }
+        tags:
+          type: array
+          items: { $ref: '#/components/schemas/Tag' }
+        test_cases:
+          type: array
+          items: { $ref: '#/components/schemas/TestCase' }
+          description: "Included when ?include=test_cases or on detail endpoint"
+        created_at: { $ref: '#/components/schemas/Timestamp' }
+        updated_at: { $ref: '#/components/schemas/Timestamp' }
+    CreateBankProblemRequest:
+      type: object
+      required: [name, description, time_limit, memory_limit, programming_language_ids]
+      properties:
+        name: { type: string, maxLength: 255 }
+        description: { type: string }
+        difficulty: { type: string, enum: [easy, medium, hard], default: "medium" }
+        time_limit: { type: integer, minimum: 100, maximum: 30000 }
+        memory_limit: { type: integer, minimum: 1024, maximum: 524288 }
+        programming_language_ids:
+          type: array
+          items: { type: integer, format: int64 }
+          minItems: 1
+        tag_ids:
+          type: array
+          items: { type: integer, format: int64 }
+        test_cases:
+          type: array
+          items: { $ref: '#/components/schemas/CreateTestCaseInput' }
+    PublishToBankRequest:
+      type: object
+      required: [problem_id]
+      properties:
+        problem_id: { type: integer, format: int64 }
+    ApproveBankProblemRequest:
+      type: object
+      required: [action]
+      properties:
+        action: { type: string, enum: [approve, reject] }
+
+    # ── Tag ──
+    Tag:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        course_id: { type: integer, format: int64 }
+        name: { type: string }
+        color: { type: string, nullable: true }
+    CreateTagRequest:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, maxLength: 50 }
+        color: { type: string, maxLength: 7, nullable: true }
+
+    # ── Programming Language ── [FIX: Schema 3 — hide judge0_id]
+    ProgrammingLanguage:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
+        version: { type: string, nullable: true }
+        monaco_language: { type: string, description: "Monaco editor language key for syntax highlighting" }
+
+    # ── Notification ── [FIX: Schema 5 — typed discriminator]
+    Notification:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        type:
+          type: string
+          enum:
+            - submission.execution_completed
+            - analysis.completed
+            - problem.test_cases_updated
+            - section.member_added
+            - section.member_removed
+            - bank_problem.approval_required
+            - bank_problem.approved
+            - bank_problem.rejected
+        data:
+          type: object
+          description: |
+            Shape depends on `type`:
+            - submission.*: { submission_id, problem_name, status }
+            - analysis.*: { analysis_problem_id, problem_name, services }
+            - problem.test_cases_updated: { problem_id, problem_name }
+            - section.member_*: { section_name, user_name }
+            - bank_problem.*: { bank_problem_id, bank_problem_name }
+        read_at: { type: string, format: date-time, nullable: true }
+        created_at: { $ref: '#/components/schemas/Timestamp' }
+
+    # ── Analysis Overview ── [NEW: Missing 6]
+    AnalysisOverview:
+      type: object
+      properties:
+        semester_id: { type: integer, format: int64 }
+        total_problems: { type: integer }
+        analyzed_problems: { type: integer }
+        total_submissions_analyzed: { type: integer }
+        similarity_flagged_count: { type: integer }
+        ai_detection_flagged_count: { type: integer }
+        vulnerability_count: { type: integer }
+        per_section:
+          type: array
+          items:
+            type: object
+            properties:
+              section_id: { type: integer, format: int64 }
+              section_name: { type: string }
+              analyzed_count: { type: integer }
+              sim_flagged: { type: integer }
+              aid_flagged: { type: integer }
+
+# ═══════════════════════════════════════════════════════════
+# PATHS
+# ═══════════════════════════════════════════════════════════
+paths:
+
+  # ── AUTH ──
+  /auth/login:
+    post:
+      tags: [Auth]
+      operationId: login
+      summary: Authenticate user
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LoginResponse' }
+        '401': { description: Invalid credentials }
+
+  /auth/register:
+    post:
+      tags: [Auth]
+      operationId: register
+      summary: Register new user
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegisterRequest' }
+      responses:
+        '201': { description: Verification email sent }
+        '422': { $ref: '#/components/responses/ValidationError' }
+
+  /auth/email/verify/{id}/{hash}:
+    get:
+      tags: [Auth]
+      operationId: verifyEmail
+      summary: Verify email address
+      security: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+        - { name: hash, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Email verified }
+        '400': { description: Invalid or expired link }
+
+  /auth/forgot-password:
+    post:
+      tags: [Auth]
+      operationId: forgotPassword
+      summary: Send password reset link
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ForgotPasswordRequest' }
+      responses:
+        '200': { description: "Always 200 (prevent email enumeration)" }
+
+  /auth/reset-password:
+    post:
+      tags: [Auth]
+      operationId: resetPassword
+      summary: Reset password with token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ResetPasswordRequest' }
+      responses:
+        '200': { description: Password reset }
+        '422': { $ref: '#/components/responses/ValidationError' }
+
+  /auth/first-time-setup:
+    post:
+      tags: [Auth]
+      operationId: firstTimeSetup
+      summary: Complete first-time registration (imported students)
+      description: |
+        [NEW: Missing 7] Students imported via Excel have auto-generated passwords
+        and is_first_time_register=true. This endpoint lets them set their own password
+        and optionally update their name. Clears the is_first_time_register flag.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FirstTimeSetupRequest' }
+      responses:
+        '200':
+          description: Setup complete
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/User' }
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      operationId: logout
+      summary: Revoke current token
+      responses:
+        '200': { description: Logged out }
+
+  # ── PROFILE ──
+  /profile:
+    get:
+      tags: [Profile]
+      operationId: getProfile
+      summary: Get current user profile
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/User' }
+    put:
+      tags: [Profile]
+      operationId: updateProfile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateProfileRequest' }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/User' }
+
+  /profile/password:
+    put:
+      tags: [Profile]
+      operationId: changePassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ChangePasswordRequest' }
+      responses:
+        '200': { description: Password changed }
+
+  /profile/avatar:
+    post:
+      tags: [Profile]
+      operationId: uploadAvatar
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [avatar]
+              properties:
+                avatar: { type: string, format: binary }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      avatar_url: { type: string }
+    delete:
+      tags: [Profile]
+      operationId: removeAvatar
+      responses:
+        '204': { $ref: '#/components/responses/NoContent' }
+
+  # ── DASHBOARD ── [NEW: Missing 3]
+  /me/sections:
+    get:
+      tags: [Dashboard]
+      operationId: getMySections
+      summary: Get all sections current user belongs to (dashboard shortcut)
+      description: |
+        Returns sections grouped by course/semester with summary stats.
+        Student sees: problems count, solved count, pending submissions.
+        Instructor sees: student count, recent submissions count.
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/MySection' }
+
+  # ── ORGANIZATIONS ──
+  /organizations:
+    get:
+      tags: [Organizations]
+      operationId: listOrganizations
+      parameters:
+        - $ref: '#/components/parameters/QueryCursor'
+        - $ref: '#/components/parameters/QueryPerPage'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Organization' }
+                  meta: { $ref: '#/components/schemas/CursorMeta' }
+    post:
+      tags: [Organizations]
+      operationId: createOrganization
+      summary: Create organization (System Admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateOrganizationRequest' }
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Organization' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /organizations/{organization_id}:
+    get:
+      tags: [Organizations]
+      operationId: getOrganization
+      parameters: [{ $ref: '#/components/parameters/PathOrganizationId' }]
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Organization' }
+    put:
+      tags: [Organizations]
+      operationId: updateOrganization
+      parameters: [{ $ref: '#/components/parameters/PathOrganizationId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateOrganizationRequest' }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Organization' }
+
+  /organizations/{organization_id}/avatar:
+    post:
+      tags: [Organizations]
+      operationId: uploadOrgAvatar
+      parameters: [{ $ref: '#/components/parameters/PathOrganizationId' }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                avatar: { type: string, format: binary }
+      responses:
+        '200': { description: Avatar uploaded }
+    delete:
+      tags: [Organizations]
+      operationId: removeOrgAvatar
+      parameters: [{ $ref: '#/components/parameters/PathOrganizationId' }]
+      responses:
+        '204': { $ref: '#/components/responses/NoContent' }
+
+  /organizations/{organization_id}/members:
+    get:
+      tags: [Organizations]
+      operationId: listOrgMembers
+      parameters:
+        - $ref: '#/components/parameters/PathOrganizationId'
+        - $ref: '#/components/parameters/QueryCursor'
+        - $ref: '#/components/parameters/QueryPerPage'
+        - { name: role, in: query, schema: { type: string, enum: [admin, instructor] } }
+        - { name: search, in: query, schema: { type: string } }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/OrganizationMember' }
+                  meta: { $ref: '#/components/schemas/CursorMeta' }
+    post:
+      tags: [Organizations]
+      operationId: addOrgMembers
+      parameters: [{ $ref: '#/components/parameters/PathOrganizationId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AddOrgMembersRequest' }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      added: { type: integer }
+                      skipped: { type: integer }
+                      invited: { type: integer }
+
+  /organizations/{organization_id}/members/{member_id}:
+    put:
+      tags: [Organizations]
+      operationId: updateOrgMemberRole
+      parameters:
+        - $ref: '#/components/parameters/PathOrganizationId'
+        - $ref: '#/components/parameters/PathMemberId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role]
+              properties:
+                role: { type: string, enum: [admin, instructor] }
+      responses:
+        '200': { description: Role updated }
+        '409': { description: "Cannot demote last admin (code: LAST_ADMIN)" }
+    delete:
+      tags: [Organizations]
+      operationId: removeOrgMember
+      parameters:
+        - $ref: '#/components/parameters/PathOrganizationId'
+        - $ref: '#/components/parameters/PathMemberId'
+      responses:
+        '204': { $ref: '#/components/responses/NoContent' }
+        '409': { description: Cannot remove last admin }
+
+  # ── COURSES ──
+  /organizations/{organization_id}/courses:
+    get:
+      tags: [Courses]
+      operationId: listCourses
+      parameters:
+        - $ref: '#/components/parameters/PathOrganizationId'
+        - $ref: '#/components/parameters/QueryCursor'
+        - $ref: '#/components/parameters/QueryPerPage'
+        - { name: search, in: query, schema: { type: string } }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Course' }
+                  meta: { $ref: '#/components/schemas/CursorMeta' }
+    post:
+      tags: [Courses]
+      operationId: createCourse
+      parameters: [{ $ref: '#/components/parameters/PathOrganizationId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateCourseRequest' }
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Course' }
+        '409': { description: Course code already exists in this org }
+
+  /courses/{course_id}:
+    get:
+      tags: [Courses]
+      operationId: getCourse
+      parameters: [{ $ref: '#/components/parameters/PathCourseId' }]
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Course' }
+    put:
+      tags: [Courses]
+      operationId: updateCourse
+      parameters: [{ $ref: '#/components/parameters/PathCourseId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateCourseRequest' }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Course' }
+
+  # ── SEMESTERS ──
+  /courses/{course_id}/semesters:
+    get:
+      tags: [Semesters]
+      operationId: listSemesters
+      parameters:
+        - $ref: '#/components/parameters/PathCourseId'
+        - $ref: '#/components/parameters/QueryCursor'
+        - $ref: '#/components/parameters/QueryPerPage'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Semester' }
+                  meta: { $ref: '#/components/schemas/CursorMeta' }
+    post:
+      tags: [Semesters]
+      operationId: createSemester
+      parameters: [{ $ref: '#/components/parameters/PathCourseId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateSemesterRequest' }
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Semester' }
+        '409': { description: Semester name already exists }
+
+  /semesters/{semester_id}:
+    get:
+      tags: [Semesters]
+      operationId: getSemester
+      parameters: [{ $ref: '#/components/parameters/PathSemesterId' }]
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Semester' }
+    put:
+      tags: [Semesters]
+      operationId: updateSemester
+      parameters: [{ $ref: '#/components/parameters/PathSemesterId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateSemesterRequest' }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Semester' }
+
+  # ── SECTIONS ──
+  /semesters/{semester_id}/sections:
+    get:
+      tags: [Sections]
+      operationId: listSections
+      parameters: [{ $ref: '#/components/parameters/PathSemesterId' }]
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Section' }
+    post:
+      tags: [Sections]
+      operationId: createSection
+      parameters: [{ $ref: '#/components/parameters/PathSemesterId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateSectionRequest' }
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Section' }
+
+  /sections/{section_id}:
+    get:
+      tags: [Sections]
+      operationId: getSection
+      parameters: [{ $ref: '#/components/parameters/PathSectionId' }]
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Section' }
+    put:
+      tags: [Sections]
+      operationId: updateSection
+      parameters: [{ $ref: '#/components/parameters/PathSectionId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateSectionRequest' }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Section' }
+
+  # ── SECTION MEMBERS ──
+  /sections/{section_id}/members:
+    get:
+      tags: [Section Members]
+      operationId: listSectionMembers
+      parameters:
+        - $ref: '#/components/parameters/PathSectionId'
+        - $ref: '#/components/parameters/QueryCursor'
+        - $ref: '#/components/parameters/QueryPerPage'
+        - { name: role, in: query, schema: { type: string, enum: [instructor, ta, student] } }
+        - { name: search, in: query, schema: { type: string } }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/SectionMember' }
+                  meta: { $ref: '#/components/schemas/CursorMeta' }
+    post:
+      tags: [Section Members]
+      operationId: addSectionMembers
+      parameters: [{ $ref: '#/components/parameters/PathSectionId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AddSectionMembersRequest' }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      added: { type: integer }
+                      skipped: { type: integer }
+                      invited: { type: integer }
+        '422': { description: "Student already in another section (D-51)" }
+
+  /sections/{section_id}/members/import:
+    post:
+      tags: [Section Members]
+      operationId: importSectionMembers
+      parameters: [{ $ref: '#/components/parameters/PathSectionId' }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      imported: { type: integer }
+                      skipped: { type: integer }
+                      created_accounts: { type: integer, description: "New user accounts auto-created (FTR flow)" }
+                      errors:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            row: { type: integer }
+                            error: { type: string }
+
+  /sections/{section_id}/members/{member_id}:
+    put:
+      tags: [Section Members]
+      operationId: updateSectionMemberRole
+      parameters:
+        - $ref: '#/components/parameters/PathSectionId'
+        - $ref: '#/components/parameters/PathMemberId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role]
+              properties:
+                role: { type: string, enum: [instructor, ta, student] }
+      responses:
+        '200': { description: Role updated }
+    delete:
+      tags: [Section Members]
+      operationId: removeSectionMember
+      parameters:
+        - $ref: '#/components/parameters/PathSectionId'
+        - $ref: '#/components/parameters/PathMemberId'
+      responses:
+        '204': { $ref: '#/components/responses/NoContent' }
+
+  /sections/{section_id}/members/{member_id}/transfer:
+    post:
+      tags: [Section Members]
+      operationId: transferStudent
+      summary: Transfer student to another section (Org Admin, D-50)
+      parameters:
+        - $ref: '#/components/parameters/PathSectionId'
+        - $ref: '#/components/parameters/PathMemberId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TransferStudentRequest' }
+      responses:
+        '200': { description: Transferred and logged }
+        '422': { description: Target section not in same semester }
+
+  # ── PROBLEMS ──
+  /sections/{section_id}/problems:
+    get:
+      tags: [Problems]
+      operationId: listProblems
+      description: Students see only visible/published. Instructors see all.
+      parameters:
+        - $ref: '#/components/parameters/PathSectionId'
+        - { name: group_label, in: query, schema: { type: string } }
+        - { name: difficulty, in: query, schema: { type: string, enum: [easy, medium, hard] } }
+        - $ref: '#/components/parameters/QueryInclude'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Problem' }
+    post:
+      tags: [Problems]
+      operationId: createProblem
+      parameters: [{ $ref: '#/components/parameters/PathSectionId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateProblemRequest' }
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/ProblemDetail' }
+
+  /sections/{section_id}/problems/clone:
+    post:
+      tags: [Problems]
+      operationId: cloneFromBank
+      summary: "Clone from Problem Bank. bank_problem_id must belong to same Course."
+      parameters: [{ $ref: '#/components/parameters/PathSectionId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CloneFromBankRequest' }
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/ProblemDetail' }
+        '422': { description: "BANK_COURSE_MISMATCH or validation error" }
+
+  /sections/{section_id}/problems/reorder:
+    put:
+      tags: [Problems]
+      operationId: reorderProblems
+      summary: "[NEW: Missing 4] Bulk reorder problems within section"
+      parameters: [{ $ref: '#/components/parameters/PathSectionId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReorderProblemsRequest' }
+      responses:
+        '200': { description: Order updated }
+
+  /problems/{problem_id}:
+    get:
+      tags: [Problems]
+      operationId: getProblem
+      parameters:
+        - $ref: '#/components/parameters/PathProblemId'
+        - $ref: '#/components/parameters/QueryInclude'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    oneOf:
+                      - $ref: '#/components/schemas/Problem'
+                      - $ref: '#/components/schemas/ProblemDetail'
+    put:
+      tags: [Problems]
+      operationId: updateProblem
+      parameters: [{ $ref: '#/components/parameters/PathProblemId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateProblemRequest' }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/ProblemDetail' }
+                  meta:
+                    type: object
+                    properties:
+                      outdated_submissions_count: { type: integer, description: "If core fields changed" }
+        '422': { description: "PROBLEM_LOCKED if core fields on locked problem" }
+    delete:
+      tags: [Problems]
+      operationId: deleteProblem
+      summary: "Soft delete (D-43). Always succeeds — sets deleted_at."
+      description: |
+        [FIX: Bug 3] Soft delete is always allowed. Problem disappears from UI
+        but data preserved. Submissions are never deleted (D-52).
+      parameters: [{ $ref: '#/components/parameters/PathProblemId' }]
+      responses:
+        '204': { $ref: '#/components/responses/NoContent' }
+
+  /problems/{problem_id}/publish:
+    patch:
+      tags: [Problems]
+      operationId: togglePublish
+      summary: Manual publish/unpublish
+      description: |
+        [FIX: Bug 6] Rules:
+        - If semester.allow_publish_override=false AND requester is Instructor → 422.
+        - Org Admin always bypasses semester policy.
+      parameters: [{ $ref: '#/components/parameters/PathProblemId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                is_published: { type: boolean }
+      responses:
+        '200': { description: Updated }
+        '422': { description: "POLICY_OVERRIDE_DENIED" }
+
+  /problems/{problem_id}/lock:
+    patch:
+      tags: [Problems]
+      operationId: toggleLock
+      summary: Manual lock/unlock
+      description: Same override rules as publish. Org Admin bypasses.
+      parameters: [{ $ref: '#/components/parameters/PathProblemId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                is_locked: { type: boolean }
+      responses:
+        '200': { description: Updated }
+        '422': { description: "POLICY_OVERRIDE_DENIED" }
+
+  # ── TEST CASES ──
+  /problems/{problem_id}/test-cases:
+    get:
+      tags: [Test Cases]
+      operationId: listTestCases
+      summary: "List all test cases (Instructor/OrgAdmin). No pagination — max 50."
+      parameters: [{ $ref: '#/components/parameters/PathProblemId' }]
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/TestCase' }
+    put:
+      tags: [Test Cases]
+      operationId: batchUpdateTestCases
+      summary: "Batch create/update/delete. Blocked when locked (D-41)."
+      description: |
+        [FIX: Bug 2] Side effects when submissions exist:
+        1. All existing submissions flagged is_outdated=true
+        2. problems.testcases_updated_at set to now()
+        3. Notification sent to all students who submitted
+      parameters: [{ $ref: '#/components/parameters/PathProblemId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BatchUpdateTestCasesRequest' }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/TestCase' }
+                  meta:
+                    type: object
+                    properties:
+                      outdated_submissions_count: { type: integer }
+                      notifications_sent: { type: integer }
+        '422': { description: "PROBLEM_LOCKED" }
+
+  # ── SUBMISSIONS ──
+  /problems/{problem_id}/submissions:
+    get:
+      tags: [Submissions]
+      operationId: listSubmissions
+      parameters:
+        - $ref: '#/components/parameters/PathProblemId'
+        - $ref: '#/components/parameters/QueryCursor'
+        - $ref: '#/components/parameters/QueryPerPage'
+        - { name: mode, in: query, schema: { type: string, enum: [all, best, latest], default: all } }
+        - { name: student_id, in: query, schema: { type: integer, format: int64 } }
+        - { name: status, in: query, schema: { type: string, enum: [in_queue, processing, accepted, partially_accepted, error, timeout] } }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Submission' }
+                  meta: { $ref: '#/components/schemas/CursorMeta' }
+    post:
+      tags: [Submissions]
+      operationId: createSubmission
+      summary: "Submit code via Monaco editor (JSON body)"
+      description: |
+        [FIX: Bug 1] Two submission methods, separate content types:
+        - JSON body with source_code text: this endpoint
+        - File upload: POST /problems/{id}/submissions/upload
+      parameters: [{ $ref: '#/components/parameters/PathProblemId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SubmitCodeRequest' }
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Submission' }
+        '422': { description: "DEADLINE_PASSED / MAX_SUBMISSIONS / LANGUAGE_NOT_ALLOWED / SUBMISSION_PROCESSING" }
+
+  /problems/{problem_id}/submissions/upload:
+    post:
+      tags: [Submissions]
+      operationId: uploadSubmission
+      summary: "Submit code via file upload (multipart)"
+      description: "[FIX: Bug 1] Separate endpoint for file-based submission."
+      parameters: [{ $ref: '#/components/parameters/PathProblemId' }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema: { $ref: '#/components/schemas/SubmitFileRequest' }
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Submission' }
+        '422': { description: Same validation as code submit }
+
+  /sections/{section_id}/submissions:
+    get:
+      tags: [Submissions]
+      operationId: listSectionSubmissions
+      summary: "[NEW: Missing 1] List all submissions across all problems in section"
+      description: "Instructor dashboard view. Supports all filters."
+      parameters:
+        - $ref: '#/components/parameters/PathSectionId'
+        - $ref: '#/components/parameters/QueryCursor'
+        - $ref: '#/components/parameters/QueryPerPage'
+        - { name: problem_id, in: query, schema: { type: integer, format: int64 } }
+        - { name: student_id, in: query, schema: { type: integer, format: int64 } }
+        - { name: status, in: query, schema: { type: string } }
+        - { name: mode, in: query, schema: { type: string, enum: [all, best, latest], default: all } }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Submission' }
+                  meta: { $ref: '#/components/schemas/CursorMeta' }
+
+  /submissions/{submission_id}:
+    get:
+      tags: [Submissions]
+      operationId: getSubmission
+      parameters:
+        - $ref: '#/components/parameters/PathSubmissionId'
+        - { name: include_source, in: query, schema: { type: boolean, default: false } }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/SubmissionDetail' }
+
+  # ── ANALYSIS ──
+  /problems/{problem_id}/analysis:
+    post:
+      tags: [Analysis]
+      operationId: triggerAnalysis
+      summary: "Trigger Semester-scoped analysis"
+      description: |
+        [FIX: Bug 7] If analysis already processing for same scope:
+        returns 409 with existing analysis_problem_id. Use /analysis/{id}/cancel first.
+      parameters: [{ $ref: '#/components/parameters/PathProblemId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TriggerAnalysisRequest' }
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/AnalysisProblem' }
+        '409':
+          description: "ANALYSIS_IN_PROGRESS — includes existing analysis_problem_id"
+        '422': { description: No submissions to analyze }
+    get:
+      tags: [Analysis]
+      operationId: getLatestAnalysis
+      parameters: [{ $ref: '#/components/parameters/PathProblemId' }]
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/AnalysisProblem' }
+        '404': { description: No analysis exists }
+
+  /problems/{problem_id}/analysis/history:
+    get:
+      tags: [Analysis]
+      operationId: listAnalysisHistory
+      parameters: [{ $ref: '#/components/parameters/PathProblemId' }]
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/AnalysisProblem' }
+
+  /analysis/{analysis_problem_id}/cancel:
+    post:
+      tags: [Analysis]
+      operationId: cancelAnalysis
+      summary: "[NEW: Bug 7 fix] Cancel in-progress analysis"
+      description: "Marks batch as timeout. Completed submissions keep results (graceful degradation)."
+      parameters: [{ $ref: '#/components/parameters/PathAnalysisProblemId' }]
+      responses:
+        '200': { description: Cancelled }
+        '422': { description: Analysis not in processing state }
+
+  # ── ANALYSIS RESULTS ──
+  /analysis/{analysis_problem_id}/submissions:
+    get:
+      tags: [Analysis Results]
+      operationId: listAnalysisSubmissions
+      parameters:
+        - $ref: '#/components/parameters/PathAnalysisProblemId'
+        - $ref: '#/components/parameters/QueryCursor'
+        - $ref: '#/components/parameters/QueryPerPage'
+        - { name: section_id, in: query, schema: { type: integer, format: int64 } }
+        - $ref: '#/components/parameters/QueryInclude'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/AnalysisSubmission' }
+                  meta: { $ref: '#/components/schemas/CursorMeta' }
+
+  /analysis/{analysis_problem_id}/similarity:
+    get:
+      tags: [Analysis Results]
+      operationId: listSimilarityResults
+      description: "Two-tier visibility (D-05). Sorted by similarity desc."
+      parameters:
+        - $ref: '#/components/parameters/PathAnalysisProblemId'
+        - $ref: '#/components/parameters/QueryCursor'
+        - $ref: '#/components/parameters/QueryPerPage'
+        - { name: match_type, in: query, schema: { type: string, enum: [WITHIN_SECTION, CROSS_SECTION] } }
+        - { name: min_similarity, in: query, schema: { type: number, minimum: 0, maximum: 1 } }
+        - { name: section_id, in: query, schema: { type: integer, format: int64 } }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/SimilarityResult' }
+                  meta: { $ref: '#/components/schemas/CursorMeta' }
+
+  /analysis/{analysis_problem_id}/similarity/{id}:
+    get:
+      tags: [Analysis Results]
+      operationId: getSimilarityDetail
+      parameters:
+        - $ref: '#/components/parameters/PathAnalysisProblemId'
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/SimilarityResultDetail' }
+
+  /analysis/{analysis_problem_id}/ai-detection:
+    get:
+      tags: [Analysis Results]
+      operationId: listAiDetectionResults
+      parameters:
+        - $ref: '#/components/parameters/PathAnalysisProblemId'
+        - $ref: '#/components/parameters/QueryCursor'
+        - $ref: '#/components/parameters/QueryPerPage'
+        - { name: flagged_only, in: query, schema: { type: boolean } }
+        - { name: section_id, in: query, schema: { type: integer, format: int64 } }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/AiDetectionResult' }
+                  meta: { $ref: '#/components/schemas/CursorMeta' }
+
+  /analysis/{analysis_problem_id}/vulnerabilities:
+    get:
+      tags: [Analysis Results]
+      operationId: listVulnerabilityResults
+      parameters:
+        - $ref: '#/components/parameters/PathAnalysisProblemId'
+        - $ref: '#/components/parameters/QueryCursor'
+        - $ref: '#/components/parameters/QueryPerPage'
+        - { name: severity, in: query, schema: { type: string, enum: [recommendation, warning, error] } }
+        - { name: section_id, in: query, schema: { type: integer, format: int64 } }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/VulnerabilityResult' }
+                  meta: { $ref: '#/components/schemas/CursorMeta' }
+
+  # ── ANALYSIS OVERVIEW ── [NEW: Missing 6]
+  /semesters/{semester_id}/analysis-overview:
+    get:
+      tags: [Analysis Results]
+      operationId: getAnalysisOverview
+      summary: "Semester-level analysis dashboard (Org Admin)"
+      parameters: [{ $ref: '#/components/parameters/PathSemesterId' }]
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/AnalysisOverview' }
+
+  # ── MATCH GROUPS ── [NEW: Missing 5]
+  /semesters/{semester_id}/match-groups:
+    post:
+      tags: [Analysis]
+      operationId: createMatchGroup
+      summary: "Link problems for cross-section SIM comparison"
+      description: "Generates a shared manual_match_group_id UUID for all specified problems."
+      parameters: [{ $ref: '#/components/parameters/PathSemesterId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SetMatchGroupRequest' }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      manual_match_group_id: { type: string, format: uuid }
+                      problems_linked: { type: integer }
+        '422': { description: "Problems not in same Semester, or already have bank_problem_id" }
+    get:
+      tags: [Analysis]
+      operationId: listMatchGroups
+      summary: "List all manual match groups in semester"
+      parameters: [{ $ref: '#/components/parameters/PathSemesterId' }]
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        manual_match_group_id: { type: string, format: uuid }
+                        problems:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              problem_id: { type: integer, format: int64 }
+                              problem_name: { type: string }
+                              section_name: { type: string }
+
+  # ── EXPORT ── [NEW: Missing 2]
+  /sections/{section_id}/export/grades:
+    get:
+      tags: [Export]
+      operationId: exportGrades
+      summary: "Export grades as Excel (Instructor/OrgAdmin)"
+      description: |
+        Columns: student_id, student_name, per-problem best score, total.
+        Mode: best submission per student per problem.
+      parameters:
+        - $ref: '#/components/parameters/PathSectionId'
+        - { name: format, in: query, schema: { type: string, enum: [xlsx, csv], default: xlsx } }
+      responses:
+        '200':
+          description: File download
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: { type: string, format: binary }
+            text/csv:
+              schema: { type: string, format: binary }
+
+  /problems/{problem_id}/export/submissions:
+    get:
+      tags: [Export]
+      operationId: exportSubmissions
+      summary: "Export submissions for a problem (Instructor/OrgAdmin)"
+      parameters:
+        - $ref: '#/components/parameters/PathProblemId'
+        - { name: format, in: query, schema: { type: string, enum: [xlsx, csv], default: xlsx } }
+        - { name: mode, in: query, schema: { type: string, enum: [all, best, latest], default: best } }
+      responses:
+        '200':
+          description: File download
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: { type: string, format: binary }
+
+  # ── PROBLEM BANK ──
+  /courses/{course_id}/bank:
+    get:
+      tags: [Problem Bank]
+      operationId: listBankProblems
+      parameters:
+        - $ref: '#/components/parameters/PathCourseId'
+        - $ref: '#/components/parameters/QueryCursor'
+        - $ref: '#/components/parameters/QueryPerPage'
+        - { name: search, in: query, schema: { type: string } }
+        - { name: difficulty, in: query, schema: { type: string, enum: [easy, medium, hard] } }
+        - { name: tag_ids, in: query, schema: { type: string }, description: "Comma-separated tag IDs" }
+        - { name: status, in: query, schema: { type: string, enum: [pending, approved, rejected] } }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/BankProblem' }
+                  meta: { $ref: '#/components/schemas/CursorMeta' }
+    post:
+      tags: [Problem Bank]
+      operationId: createBankProblem
+      parameters: [{ $ref: '#/components/parameters/PathCourseId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateBankProblemRequest' }
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/BankProblem' }
+
+  /courses/{course_id}/bank/publish:
+    post:
+      tags: [Problem Bank]
+      operationId: publishToBank
+      parameters: [{ $ref: '#/components/parameters/PathCourseId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PublishToBankRequest' }
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/BankProblem' }
+
+  /bank-problems/{bank_problem_id}:
+    get:
+      tags: [Problem Bank]
+      operationId: getBankProblem
+      parameters: [{ $ref: '#/components/parameters/PathBankProblemId' }]
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/BankProblem' }
+    put:
+      tags: [Problem Bank]
+      operationId: updateBankProblem
+      parameters: [{ $ref: '#/components/parameters/PathBankProblemId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateBankProblemRequest' }
+      responses:
+        '200': { description: Updated }
+    delete:
+      tags: [Problem Bank]
+      operationId: deleteBankProblem
+      parameters: [{ $ref: '#/components/parameters/PathBankProblemId' }]
+      responses:
+        '204': { $ref: '#/components/responses/NoContent' }
+
+  /bank-problems/{bank_problem_id}/approve:
+    patch:
+      tags: [Problem Bank]
+      operationId: approveBankProblem
+      parameters: [{ $ref: '#/components/parameters/PathBankProblemId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ApproveBankProblemRequest' }
+      responses:
+        '200': { description: Status updated }
+
+  /bank-problems/{bank_problem_id}/versions:
+    get:
+      tags: [Problem Bank]
+      operationId: listBankProblemVersions
+      parameters: [{ $ref: '#/components/parameters/PathBankProblemId' }]
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/BankProblem' }
+
+  # ── TAGS (no pagination — small collection) ──
+  /courses/{course_id}/tags:
+    get:
+      tags: [Tags]
+      operationId: listTags
+      parameters: [{ $ref: '#/components/parameters/PathCourseId' }]
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Tag' }
+    post:
+      tags: [Tags]
+      operationId: createTag
+      parameters: [{ $ref: '#/components/parameters/PathCourseId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateTagRequest' }
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Tag' }
+
+  /tags/{tag_id}:
+    put:
+      tags: [Tags]
+      operationId: updateTag
+      parameters: [{ $ref: '#/components/parameters/PathTagId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateTagRequest' }
+      responses:
+        '200': { description: Updated }
+    delete:
+      tags: [Tags]
+      operationId: deleteTag
+      parameters: [{ $ref: '#/components/parameters/PathTagId' }]
+      responses:
+        '204': { $ref: '#/components/responses/NoContent' }
+
+  # ── PROGRAMMING LANGUAGES (no pagination — seed data) ──
+  /programming-languages:
+    get:
+      tags: [Programming Languages]
+      operationId: listProgrammingLanguages
+      security: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/ProgrammingLanguage' }
+
+  # ── NOTIFICATIONS ──
+  /notifications:
+    get:
+      tags: [Notifications]
+      operationId: listNotifications
+      parameters:
+        - $ref: '#/components/parameters/QueryCursor'
+        - $ref: '#/components/parameters/QueryPerPage'
+        - { name: unread_only, in: query, schema: { type: boolean, default: false } }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Notification' }
+                  meta: { $ref: '#/components/schemas/CursorMeta' }
+                  unread_count: { type: integer }
+
+  /notifications/mark-read:
+    post:
+      tags: [Notifications]
+      operationId: markNotificationsRead
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ids:
+                  type: array
+                  items: { type: string, format: uuid }
+                  description: "Empty = mark all"
+      responses:
+        '200': { description: Marked }
+
+  # ── SYSTEM ADMIN ──
+  /admin/organizations:
+    get:
+      tags: [System Admin]
+      operationId: adminListOrganizations
+      parameters:
+        - $ref: '#/components/parameters/QueryCursor'
+        - $ref: '#/components/parameters/QueryPerPage'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Organization' }
+                  meta: { $ref: '#/components/schemas/CursorMeta' }
+        '403': { $ref: '#/components/responses/Forbidden' }
