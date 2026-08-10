@@ -1,0 +1,36 @@
+# Environment
+.env
+*.env.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Laravel
+services/api/vendor/
+services/api/node_modules/
+services/api/storage/*.key
+services/api/.env
+
+# Vue
+services/web/node_modules/
+services/web/dist/
+
+# Go
+/go.work.sum
+
+# Python
+services/ai-detector/.venv/
+services/ai-detector/__pycache__/
+*.pyc
+
+# Docker
+docker-compose.override.yml
+
+deprecated/**
