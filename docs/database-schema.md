@@ -2,7 +2,7 @@
 
 > **Version**: 2.0 — 18/03/2026
 > **Authors**: Gideon & Claude (Anthropic)
-> **Stack**: Laravel 12 migrations on PostgreSQL 16 + PgBouncer
+> **Stack**: Laravel 13 migrations on PostgreSQL 16 + PgBouncer
 > **Status**: Phase 1 Deliverable — Complete Schema Specification
 
 ---
@@ -12,7 +12,7 @@
 ### 1.1. Design Principles
 
 - **Designed from zero** — v1.0 schema is reference only, not a starting point.
-- **Laravel 12 conventions** throughout: `$table->id()`, `$table->timestamps()`, `$table->softDeletes()`, `foreignId()->constrained()`.
+- **Laravel 13 conventions** throughout: `$table->id()`, `$table->timestamps()`, `$table->softDeletes()`, `foreignId()->constrained()`.
 - **PostgreSQL 16 features**: JSONB for flexible data, UUID for group identifiers, DECIMAL for precision scores, partial unique indexes.
 - **FK RESTRICT by default** — data preservation in education context. CASCADE only where explicitly noted.
 - **Soft deletes** only on `problems` (D-43) and `bank_problems` (D-67).

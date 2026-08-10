@@ -299,13 +299,13 @@ All tech stack finalized. Each service has a clear stack:
 
 | Service | Name | Language | Tech Stack |
 |---|---|---|---|
-| Management API | `api` | PHP 8.3+ | Laravel 12, PHP-FPM, Sanctum, Spatie, Eloquent |
+| Management API | `api` | PHP 8.4+ | Laravel 13, PHP-FPM, Sanctum, Spatie, Eloquent |
 | Frontend | `web` | TypeScript | Vue 3, Vite, shadcn-vue, Tailwind CSS, Monaco Editor |
 | WebSocket | `reverb` | PHP | Laravel Reverb (separate process, not Octane) |
-| Code Execution | `code-executor` | Go 1.22+ | sqlx + pgx, slog, Judge0 API |
-| Plagiarism | `plagiarism-checker` | Go 1.22+ | sqlx + pgx, slog, Dolos CLI |
-| AI Detection | `ai-detector` | Python 3.11+ | psycopg3, pika, structlog, PyTorch, Transformers |
-| Vuln Scan | `vuln-scanner` | Go 1.22+ | sqlx + pgx, slog, CodeQL CLI |
+| Code Execution | `code-executor` | Go 1.26+ | sqlx + pgx, slog, Judge0 API |
+| Plagiarism | `plagiarism-checker` | Go 1.26+ | sqlx + pgx, slog, Dolos CLI |
+| AI Detection | `ai-detector` | Python 3.12+ | psycopg3, pika, structlog, PyTorch, Transformers |
+| Vuln Scan | `vuln-scanner` | Go 1.26+ | sqlx + pgx, slog, CodeQL CLI |
 
 **Go services: shared packages (D-29)**
 
@@ -388,7 +388,7 @@ All 33 architectural and design decisions have been finalized. Tech stack is com
 | D-07 | Problem Bank | Fork model, version history | Avoid data drift |
 | D-08 | Enrollment | Attach to Section | Students register for specific classes |
 | D-09 | UX navigation | Dashboard per role | Student: 1 click, Instructor: 2 clicks |
-| D-10 | Laravel version | Laravel 12 | Latest version |
+| D-10 | Laravel version | Laravel 13 | Latest version |
 | D-11 | Cost | Open-source, free tier priority | Academic budget constraints |
 | D-12 | Roles | 4: Org Admin, Instructor, TA, Student | Reflects reality |
 | D-13 | TA | Optional per Section | Not every section has a TA |

@@ -34,13 +34,13 @@ This document defines the complete Docker Compose configuration and monorepo pro
 
 | # | Category | Container | Image | Exposed Port | Notes |
 |---|---|---|---|---|---|
-| 1 | Application | `api` | Custom (PHP 8.3 + PHP-FPM) | — (behind Traefik) | Laravel 12, 50 FPM workers |
+| 1 | Application | `api` | Custom (PHP 8.4 + PHP-FPM) | — (behind Traefik) | Laravel 13, 50 FPM workers |
 | 2 | Application | `web` | Custom (Node + nginx) | — (behind Traefik) | Vue 3 SPA, static build served by nginx |
 | 3 | Application | `reverb` | Custom (reuses `api` image) | — (behind Traefik) | Laravel Reverb, separate process |
-| 4 | Application | `code-executor` | Custom (Go 1.22+) | — | CES, Judge0 API client |
-| 5 | Application | `plagiarism-checker` | Custom (Go 1.22+) | — | SIM, Dolos CLI |
-| 6 | Application | `ai-detector` | Custom (Python 3.11+) | — | AID, PyTorch + CodeBERT |
-| 7 | Application | `vuln-scanner` | Custom (Go 1.22+) | — | VUL, CodeQL CLI |
+| 4 | Application | `code-executor` | Custom (Go 1.26+) | — | CES, Judge0 API client |
+| 5 | Application | `plagiarism-checker` | Custom (Go 1.26+) | — | SIM, Dolos CLI |
+| 6 | Application | `ai-detector` | Custom (Python 3.12+) | — | AID, PyTorch + CodeBERT |
+| 7 | Application | `vuln-scanner` | Custom (Go 1.26+) | — | VUL, CodeQL CLI |
 | 8 | Data | `postgres` | postgres:16-alpine | 5432 (internal) | Primary database |
 | 9 | Data | `pgbouncer` | bitnami/pgbouncer | 6432 (internal) | Connection pooler (D-89) |
 | 10 | Data | `rabbitmq` | rabbitmq:3-management-alpine | 15672 (mgmt UI) | 6 queues (D-83) |
@@ -1203,7 +1203,7 @@ magecode/
 ├── README.md                           # Project overview, setup guide
 │
 ├── services/
-│   ├── api/                            # Laravel 12 (PHP 8.3)
+│   ├── api/                            # Laravel 13 (PHP 8.4)
 │   │   ├── CLAUDE.md                   # Agent context: api service
 │   │   ├── Dockerfile                  # Multi-stage: composer → PHP-FPM + nginx
 │   │   ├── .env.example
@@ -1266,7 +1266,7 @@ magecode/
 │   │   ├── vite.config.ts
 │   │   └── tailwind.config.ts
 │   │
-│   ├── code-executor/                  # Go 1.22+ (CES)
+│   ├── code-executor/                  # Go 1.26+ (CES)
 │   │   ├── CLAUDE.md                   # Agent context: CES
 │   │   ├── Dockerfile                  # Multi-stage: go build → scratch/alpine
 │   │   ├── cmd/
@@ -1279,7 +1279,7 @@ magecode/
 │   │   ├── go.mod
 │   │   └── go.sum
 │   │
-│   ├── plagiarism-checker/             # Go 1.22+ (SIM)
+│   ├── plagiarism-checker/             # Go 1.26+ (SIM)
 │   │   ├── CLAUDE.md                   # Agent context: SIM
 │   │   ├── Dockerfile
 │   │   ├── cmd/
@@ -1292,7 +1292,7 @@ magecode/
 │   │   ├── go.mod
 │   │   └── go.sum
 │   │
-│   ├── ai-detector/                    # Python 3.11+ (AID)
+│   ├── ai-detector/                    # Python 3.12+ (AID)
 │   │   ├── CLAUDE.md                   # Agent context: AID
 │   │   ├── Dockerfile                  # Multi-stage: deps → runtime
 │   │   ├── src/
@@ -1305,7 +1305,7 @@ magecode/
 │   │   ├── requirements.txt
 │   │   └── pyproject.toml
 │   │
-│   └── vuln-scanner/                   # Go 1.22+ (VUL)
+│   └── vuln-scanner/                   # Go 1.26+ (VUL)
 │       ├── CLAUDE.md                   # Agent context: VUL
 │       ├── Dockerfile
 │       ├── cmd/
@@ -1414,7 +1414,7 @@ and security vulnerabilities.
 
 ## Architecture
 - **Monorepo** with 7 services under `services/`
-- **Stack**: PHP (Laravel 12), Go 1.22+, Python 3.11+, Vue 3 + TypeScript
+- **Stack**: PHP (Laravel 13), Go 1.26+, Python 3.12+, Vue 3 + TypeScript
 - **Data**: PostgreSQL 16 + PgBouncer, RabbitMQ, MinIO (S3)
 - **Code Execution**: Judge0 CE (separate compose, privileged containers)
 - **Routing**: Traefik (Docker auto-discovery)
@@ -1430,7 +1430,7 @@ and security vulnerabilities.
 ## Service Map
 | Service | Path | Language | DB Access |
 |---------|------|----------|-----------|
-| api | services/api/ | PHP 8.3 | Yes (via PgBouncer) |
+| api | services/api/ | PHP 8.4 | Yes (via PgBouncer) |
 | web | services/web/ | TypeScript | No |
 | reverb | (uses api image) | PHP | Yes (channel auth) |
 | code-executor | services/code-executor/ | Go | Yes (via PgBouncer) |

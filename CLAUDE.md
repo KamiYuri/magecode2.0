@@ -7,7 +7,7 @@ and security vulnerabilities.
 
 ## Architecture
 - **Monorepo** with 7 services under `services/`
-- **Stack**: PHP (Laravel 12), Go 1.22+, Python 3.11+, Vue 3 + TypeScript
+- **Stack**: PHP (Laravel 13), Go 1.26+, Python 3.12+, Vue 3 + TypeScript
 - **Data**: PostgreSQL 16 + PgBouncer, RabbitMQ, MinIO (S3)
 - **Code Execution**: Judge0 CE (separate compose, privileged containers)
 - **Routing**: Traefik (Docker auto-discovery)
@@ -24,7 +24,7 @@ and security vulnerabilities.
 ## Service Map
 | Service | Path | Language | DB Access |
 |---------|------|----------|-----------|
-| api | services/api/ | PHP 8.3 | Yes (via PgBouncer) |
+| api | services/api/ | PHP 8.4 | Yes (via PgBouncer) |
 | web | services/web/ | TypeScript | No |
 | reverb | (uses api image) | PHP | Yes (channel auth) |
 | code-executor | services/code-executor/ | Go | Yes (via PgBouncer) |

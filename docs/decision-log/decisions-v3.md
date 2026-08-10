@@ -248,4 +248,15 @@ With all 118 decisions finalized, Phase 1 deliverables to complete:
 
 ---
 
+## 7. Amendments
+
+Corrections applied in place across the decision logs and design docs after Phase 1 sign-off.
+Original text is updated inline; this table records what changed and why.
+
+| Date | Decision(s) | Change | Rationale |
+|---|---|---|---|
+| 2026-08-10 | D-10 | Laravel 12 → 13, PHP 8.3 → 8.4, Go 1.22 → 1.26, Python 3.11 → 3.12 | D-10's rationale is "latest version"; Laravel 13 + PHP 8.4 validated by the deprecated 2.0 prototype. See `docs/superpowers/plans/2026-08-10-magecode-2.0-upgrade-roadmap.md` (U-1) |
+
+---
+
 *— End of Decision Log v3 —*

@@ -14,7 +14,7 @@ MageCode is a microservices-based platform for automated code assessment. Studen
          │               │                   │
    ┌─────┴──────┐   ┌────┴────┐          ┌───┴───┐
    │  api (PHP) │   │ reverb  │          │  web  │
-   │ Laravel 12 │   │  (WS)   │          │Vue SPA│
+   │ Laravel 13 │   │  (WS)   │          │Vue SPA│
    └─────┬──────┘   └────┬────┘          └───────┘
          │               │
     ┌────┴───────────────┴─────────────────────────┐
@@ -37,7 +37,7 @@ MageCode is a microservices-based platform for automated code assessment. Studen
 
 | Service | Language | DB Access | Purpose |
 |---------|----------|:---------:|---------|
-| `api` | PHP 8.4 (Laravel 12) | ✅ | REST API, queue dispatch |
+| `api` | PHP 8.4 (Laravel 13) | ✅ | REST API, queue dispatch |
 | `web` | TypeScript (Vue 3) | — | SPA frontend |
 | `reverb` | PHP (reuses api image) | ✅ | WebSocket server |
 | `code-executor` | Go | ✅ | Submit code to Judge0, stream results |
@@ -66,7 +66,7 @@ MageCode is a microservices-based platform for automated code assessment. Studen
 | `web` | Node.js | ^20.19 or ≥22.12 | [nodejs.org](https://nodejs.org/) or `nvm install 22` |
 | `web` | npm | ≥ 10 | Bundled with Node.js |
 | `code-executor`, `plagiarism-checker`, `vuln-scanner` | Go | 1.26+ | [go.dev/dl](https://go.dev/dl/) |
-| `ai-detector` | Python | ≥ 3.11 | `sudo apt install python3.12 python3.12-venv` |
+| `ai-detector` | Python | ≥ 3.12 | `sudo apt install python3.12 python3.12-venv` |
 
 ### Optional
 
@@ -147,7 +147,7 @@ make down              make logs service=api  make reset
 ```
 magecode/
 ├── services/
-│   ├── api/                # Laravel 12 REST API
+│   ├── api/                # Laravel 13 REST API
 │   ├── web/                # Vue 3 SPA
 │   ├── code-executor/      # Go — Judge0 integration
 │   ├── plagiarism-checker/ # Go — Dolos CLI wrapper
