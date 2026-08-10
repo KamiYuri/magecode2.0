@@ -5,6 +5,15 @@ MageCode is a microservices-based code assessment platform for university educat
 Students submit code, the system auto-grades and analyzes for plagiarism, AI-generation,
 and security vulnerabilities.
 
+## Session Start (REQUIRED)
+1. Read `docs/session-guide.md` — workflow, SoT hierarchy, checklists for every session.
+2. Read `docs/progress.md` — live task board; continue `wip` tasks or pick the next
+   unblocked P0 of the current milestone (definitions in `docs/roadmap.md`).
+3. Branch before any change per `.agents/workflows/branch.md` — never commit to `main`,
+   `dev`, or `{service}/dev` directly. TDD per `.agents/workflows/dev-rules.md`.
+4. `/home/gideon/Documents/BKCS/deprecated_magecode` is an abandoned 2.0 prototype —
+   reference/salvage only, NEVER source of truth.
+
 ## Architecture
 - **Monorepo** with 7 services under `services/`
 - **Stack**: PHP (Laravel 13), Go 1.26+, Python 3.12+, Vue 3 + TypeScript
@@ -54,5 +63,16 @@ cd services/code-executor && go run ./cmd/main.go
 cd services/ai-detector && source .venv/bin/activate && python src/main.py
 ```
 
+## Documentation Map
+| Question | Read |
+|---|---|
+| What to build next, task definitions | `docs/roadmap.md` + `docs/progress.md` |
+| Session workflow & checklists | `docs/session-guide.md` |
+| System design, domain, decisions | `docs/technical-design.md`, `docs/decision-log/` (amendments: v3 §7) |
+| DB / API / queue contracts | `docs/database-schema.md`, `docs/api-contracts/openapi.yml`, `shared/schemas/` |
+| Frontend UX/visual spec | `docs/ui-ux-design.md` |
+| Infra & containers | `docs/docker-compose-architecture.md` |
+
 ## Per-Service Context
-Each service has its own `CLAUDE.md` with purpose, tech stack, key files, env vars, and testing.
+Each service has its own `CLAUDE.md` with purpose, tech stack, key files, env vars, and testing
+(created together with the service scaffold — tasks A7/B1/F1).
