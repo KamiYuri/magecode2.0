@@ -12,7 +12,7 @@
 
 | Task | Prio | Status | Ref | Notes |
 |---|---|---|---|---|
-| A1 logger | P0 | todo | — | — |
+| A1 logger | P0 | wip | `shared/feat/logger` | — |
 | A2 config | P0 | todo | — | — |
 | A3 apperror | P0 | todo | — | — |
 | A4 rmq | P0 | todo | — | — |
