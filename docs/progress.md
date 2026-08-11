@@ -15,7 +15,7 @@
 | A1 logger | P0 | done | `ab7f1e5` | slog JSON handler per D-88; tests green (GOWORK=off — go.work still broken until A7) |
 | A2 config | P0 | done | `5dff1fe` | fail-fast Load(spec) validates presence + coercion up front; getters infallible |
 | A3 apperror | P0 | done | `3c32d1b` | outermost classification wins; unclassified errors are neither (consumer picks default) |
-| A4 rmq | P0 | wip | `shared/feat/rmq` | — |
+| A4 rmq | P0 | done | `fd47c34` | topology Q/Q.retry/Q.dlq; retry via republish + per-message TTL; integration suite: `go test -tags integration` (needs compose rabbitmq + RMQ_TEST_URL) |
 | A5 db | P0 | todo | — | — |
 | A6 storage | P0 | todo | — | — |
 | A7 scaffolds + go.work | P0 | todo | — | — |
@@ -127,3 +127,4 @@
 | 2026-08-10 | A2 | done — `shared/go/config` fail-fast env loader, 8 tests green, merged to `shared/dev`. |
 | 2026-08-10 | A3 | done — `shared/go/apperror` Transient/Permanent taxonomy, 7 tests green, merged to `shared/dev`. A4 must decide default routing for unclassified errors. |
 | 2026-08-11 | infra | Deployed compose infra + observability (postgres, pgbouncer, rabbitmq, minio, loki, prometheus, grafana, exporters); Loki docker plugin installed. Known issues: `php-fpm-exporter` has hard `depends_on: api` breaking `--profile observability` alone (workaround: start services by name; fix on an `infra/` branch); Prometheus `minio` target down (metrics auth config, revisit in G1). |
+| 2026-08-11 | A4 | done — `shared/go/rmq` publisher/consumer, 7 unit + 4 integration tests green vs compose RabbitMQ, merged to `shared/dev`. M0 smoke pub/sub requirement covered by roundtrip integration test. |
