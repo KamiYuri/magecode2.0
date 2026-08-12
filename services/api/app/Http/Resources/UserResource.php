@@ -1,0 +1,35 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Http\Resources;
+
+use App\Models\User;
+use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\JsonResource;
+
+/**
+ * The `User` schema in openapi.yml. `avatar_url` is a pre-signed MinIO URL and
+ * stays null until the storage integration lands with the profile endpoints.
+ *
+ * @mixin User
+ */
+class UserResource extends JsonResource
+{
+    /** @return array<string, mixed> */
+    public function toArray(Request $request): array
+    {
+        return [
+            'id' => $this->id,
+            'username' => $this->username,
+            'email' => $this->email,
+            'first_name' => $this->first_name,
+            'last_name' => $this->last_name,
+            'student_id' => $this->student_id,
+            'avatar_url' => null,
+            'email_verified_at' => $this->email_verified_at?->toIso8601String(),
+            'is_first_time_register' => $this->is_first_time_register,
+            'created_at' => $this->created_at?->toIso8601String(),
+        ];
+    }
+}
