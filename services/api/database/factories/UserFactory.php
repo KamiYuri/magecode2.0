@@ -9,39 +9,48 @@ use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 
-/**
- * @extends Factory<User>
- */
+/** @extends Factory<User> */
 class UserFactory extends Factory
 {
-    /**
-     * The current password being used by the factory.
-     */
-    protected static ?string $password;
+    protected $model = User::class;
 
-    /**
-     * Define the model's default state.
-     *
-     * @return array<string, mixed>
-     */
+    /** @var string|null Memoised so a bulk create only hashes once. */
+    private static ?string $password = null;
+
+    /** @return array<string, mixed> */
     public function definition(): array
     {
         return [
-            'name' => fake()->name(),
+            'username' => fake()->unique()->userName(),
             'email' => fake()->unique()->safeEmail(),
+            'password' => self::$password ??= Hash::make('password'),
+            'first_name' => fake()->firstName(),
+            'last_name' => fake()->lastName(),
+            'student_id' => null,
+            'avatar_path' => null,
             'email_verified_at' => now(),
-            'password' => static::$password ??= Hash::make('password'),
-            'remember_token' => Str::random(10),
+            'is_first_time_register' => false,
         ];
     }
 
-    /**
-     * Indicate that the model's email address should be unverified.
-     */
+    public function student(): static
+    {
+        return $this->state(fn (): array => [
+            'student_id' => (string) fake()->unique()->numberBetween(20210000, 20259999),
+        ]);
+    }
+
     public function unverified(): static
     {
-        return $this->state(fn (array $attributes) => [
+        return $this->state(fn (): array => ['email_verified_at' => null]);
+    }
+
+    public function firstTime(): static
+    {
+        return $this->state(fn (): array => [
+            'is_first_time_register' => true,
             'email_verified_at' => null,
+            'password' => Hash::make(Str::random(32)),
         ]);
     }
 }
