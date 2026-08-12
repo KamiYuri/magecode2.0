@@ -17,7 +17,7 @@
 | A3 apperror | P0 | done | `3c32d1b` | outermost classification wins; unclassified errors are neither (consumer picks default) |
 | A4 rmq | P0 | done | `fd47c34` | topology Q/Q.retry/Q.dlq; retry via republish + per-message TTL; integration suite: `go test -tags integration` (needs compose rabbitmq + RMQ_TEST_URL) |
 | A5 db | P0 | done | `330280b` | simple_protocol enforced + conflicting mode rejected; integration via pgbouncer :6432 (DB_TEST_DSN) |
-| A6 storage | P0 | todo | — | — |
+| A6 storage | P0 | wip | `shared/feat/storage` | — |
 | A7 scaffolds + go.work | P0 | todo | — | — |
 
 ## M1 — Plan B: API Core
