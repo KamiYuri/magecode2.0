@@ -6,7 +6,7 @@
 >
 > **Status values**: `todo` · `wip` · `review` · `done` · `blocked` (+ one-line reason in Notes)
 
-**Current milestone: M0** — exit: `go test ./...` green in shared/go; smoke pub/sub vs compose RabbitMQ.
+**Current milestone: M1** — exit: authz matrix test green; full CRUD via `/api/v1` on compose Postgres. (M0 passed 2026-08-12, see gate table.)
 
 ## M0 — Plan A: Shared Go Packages & Scaffolds
 
@@ -18,7 +18,7 @@
 | A4 rmq | P0 | done | `fd47c34` | topology Q/Q.retry/Q.dlq; retry via republish + per-message TTL; integration suite: `go test -tags integration` (needs compose rabbitmq + RMQ_TEST_URL) |
 | A5 db | P0 | done | `330280b` | simple_protocol enforced + conflicting mode rejected; integration via pgbouncer :6432 (DB_TEST_DSN) |
 | A6 storage | P0 | done | `7215b0e` | presign verified credential-free + expiry 403; integration needs MINIO_TEST_* env |
-| A7 scaffolds + go.work | P0 | todo | — | — |
+| A7 scaffolds + go.work | P0 | done | `36c11f9` | 3 Go images 23.8MB (<30MB); E2E smoke: container consumed mgmt-API-published msg with trace_id |
 
 ## M1 — Plan B: API Core
 
@@ -108,7 +108,7 @@
 
 | Gate | Date | Result | Evidence |
 |---|---|---|---|
-| M0 exit | — | — | — |
+| M0 exit | 2026-08-12 | PASS | `go test ./...` green in shared/go (6 pkgs, unit); integration green vs compose: rmq (roundtrip/DLX/drain), db (pgbouncer 6432 simple protocol), storage (presign). Smoke pub/sub: code-executor container consumed a mgmt-API-published message end to end (trace_id `smoke-a7`). |
 | M1 exit (authz matrix) | — | — | — |
 | M2 exit (C8) | — | — | — |
 | M3 exit (E9) | — | — | — |
@@ -130,3 +130,4 @@
 | 2026-08-11 | A4 | done — `shared/go/rmq` publisher/consumer, 7 unit + 4 integration tests green vs compose RabbitMQ, merged to `shared/dev`. M0 smoke pub/sub requirement covered by roundtrip integration test. |
 | 2026-08-11 | A5 | done — `shared/go/db` sqlx+pgx pool, 6 unit + 5 integration tests green vs compose pgbouncer, merged to `shared/dev`. Included `fix(infra)`: postgres conf lacked `listen_addresses='*'`, pgbouncer upstream was down. |
 | 2026-08-11 | A6 | done — `shared/go/storage` minio client, 7 unit + 5 integration tests green vs compose minio, merged to `shared/dev`. |
+| 2026-08-12 | A7, M0 gate | done — worker scaffolds + ai-detector skeleton + go.work fixed (`GOWORK=off` no longer needed); Go images 23.8MB; `--profile analysis config` valid. M0 exit PASS: all unit + integration suites green, container-level pub/sub smoke OK. Next: M1/B1 (Laravel skeleton). |
