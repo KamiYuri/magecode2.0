@@ -34,7 +34,7 @@
 | JSONB | Used sparingly | Only `analysis_problems.services` |
 | Composite indexes | Named `idx_{table}_{columns}` | `idx_submissions_problem_creator` |
 
-### 1.3. Table Summary (34 tables)
+### 1.3. Table Summary (35 tables)
 
 | Category | Tables | Count |
 |---|---|---|
@@ -46,8 +46,8 @@
 | Tags & Pivots | tags, problem_programming_languages, bank_problem_programming_languages, bank_problem_tags, problem_tags | 5 |
 | Audit | problem_edit_logs, section_transfer_logs | 2 |
 | Notifications | notifications | 1 |
-| Laravel Framework | password_reset_tokens, sessions, cache, cache_locks, jobs, job_batches, failed_jobs | 7 |
-| **TOTAL** | | **34** |
+| Laravel Framework | password_reset_tokens, sessions, cache, cache_locks, jobs, job_batches, failed_jobs, personal_access_tokens | 8 |
+| **TOTAL** | | **35** |
 
 ### 1.4. FK Cascade Policy
 
@@ -1065,6 +1065,7 @@ Standard tables created via Artisan commands. Not customized.
 | jobs | `php artisan queue:table` | Internal queue jobs |
 | job_batches | `php artisan queue:batches-table` | Job batch tracking |
 | failed_jobs | `php artisan queue:failed-table` | Failed jobs |
+| personal_access_tokens | `php artisan install:api` | Sanctum bearer tokens — required by the `BearerAuth` scheme in `openapi.yml` |
 
 **NOTE**: RabbitMQ is for inter-service messaging. Laravel queue tables are for INTERNAL jobs only (scheduled tasks, email sending, etc.).
 

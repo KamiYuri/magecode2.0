@@ -300,6 +300,9 @@ services:
       DB_USER: ${POSTGRES_USER}
       DB_PASSWORD: ${POSTGRES_PASSWORD}
       POOL_MODE: ${PGBOUNCER_POOL_MODE:-transaction}
+      # Same port inside the container and on the host, so DB_PORT is one
+      # value everywhere (docker-compose-architecture.md §3: 6432 internal).
+      LISTEN_PORT: ${PGBOUNCER_PORT:-6432}
       AUTH_TYPE: plain
       DEFAULT_POOL_SIZE: ${PGBOUNCER_DEFAULT_POOL_SIZE:-30}
       MAX_CLIENT_CONN: ${PGBOUNCER_MAX_CLIENT_CONN:-150}
@@ -314,7 +317,7 @@ services:
       LOG_POOLER_ERRORS: 1
       STATS_PERIOD: 60
     ports:
-      - "${PGBOUNCER_PORT:-6432}:5432"
+      - "${PGBOUNCER_PORT:-6432}:6432"
     networks:
       - backend
       - db-internal
@@ -322,7 +325,7 @@ services:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -h localhost -p 5432"]
+      test: ["CMD-SHELL", "pg_isready -h localhost -p 6432"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -491,7 +494,7 @@ services:
     profiles: ["observability", "full"]
     environment:
       PGBOUNCER_EXPORTER_HOST: pgbouncer
-      PGBOUNCER_EXPORTER_PORT: 5432
+      PGBOUNCER_EXPORTER_PORT: 6432
       PGBOUNCER_EXPORTER_USER: ${POSTGRES_USER}
       PGBOUNCER_EXPORTER_PASS: ${POSTGRES_PASSWORD}
     networks:

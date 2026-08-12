@@ -42,8 +42,12 @@ and security vulnerabilities.
 | vuln-scanner | services/vuln-scanner/ | Go | No |
 
 ## Shared Code
-- `shared/go/` — RabbitMQ, DB, MinIO, logger, config, errors
+- `shared/go/` — `logger` (D-88 JSON), `config` (fail-fast env), `apperror`
+  (Transient/Permanent → retry-vs-DLX), `rmq` (publisher/consumer, per-queue
+  `Q`/`Q.retry`/`Q.dlq`), `db` (sqlx+pgx, simple protocol for PgBouncer), `storage` (MinIO)
 - `shared/schemas/` — JSON Schema for all RabbitMQ messages
+- `services/api/app/Enums/` — every closed value set from `database-schema.md` §10;
+  resolve roles through `OrganizationRole`/`SectionRole`, never raw strings
 
 ## Infrastructure (Docker)
 ```bash
@@ -56,12 +60,21 @@ docker compose -f docker-compose.judge0.yml up -d             # Judge0 (separate
 
 ## Local Dev
 ```bash
-make dev-api                    # Laravel dev server :8000
+# api — runs inside the magecode-api:test image, so no host PHP is needed
+make test-api                   # php artisan test vs magecode_test on compose Postgres
+make lint-api                   # pint --test + phpstan (level 6)
+make migrate / make seed        # against PgBouncer :6432; seed is idempotent
+make composer-api args="..."    # composer inside the image
+
+# host toolchains
+make dev-api                    # Laravel dev server :8000 — needs host pdo_pgsql + amqp
 make dev-web                    # Vite HMR :5173
-make dev-reverb                 # WebSocket :8080
+make dev-reverb                 # WebSocket :8080 — same host PHP requirement
 cd services/code-executor && go run ./cmd/main.go
-cd services/ai-detector && source .venv/bin/activate && python src/main.py
+cd services/ai-detector && python src/main.py
 ```
+Go tests: `cd shared/go && go test ./...`; integration suites need the compose stack and
+their env var (`RMQ_TEST_URL`, `DB_TEST_DSN`, `MINIO_TEST_*`) — see `docs/progress.md`.
 
 ## Documentation Map
 | Question | Read |

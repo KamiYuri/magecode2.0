@@ -1231,7 +1231,7 @@ magecode/
 │   │   │   └── Providers/
 │   │   ├── config/
 │   │   ├── database/
-│   │   │   ├── migrations/              # All 34 tables
+│   │   │   ├── migrations/              # All 35 tables
 │   │   │   ├── factories/
 │   │   │   └── seeders/
 │   │   ├── routes/
@@ -1383,7 +1383,7 @@ magecode/
 │
 ├── docs/
 │   ├── technical-design.md             # Phase 1 technical design doc
-│   ├── database-schema.md              # Schema v2 (34 tables)
+│   ├── database-schema.md              # Schema v2 (35 tables)
 │   ├── rabbitmq-schemas.md             # Message schemas v1
 │   ├── docker-compose-architecture.md  # THIS document
 │   ├── api-contracts/                  # OpenAPI specs
