@@ -30,6 +30,7 @@ use Laravel\Sanctum\HasApiTokens;
  * @property string|null $avatar_path
  * @property Carbon|null $email_verified_at
  * @property bool $is_first_time_register
+ * @property bool $is_system_admin
  */
 #[Fillable(['username', 'email', 'password', 'first_name', 'last_name', 'student_id', 'avatar_path', 'is_first_time_register'])]
 #[Hidden(['password'])]
@@ -38,6 +39,14 @@ class User extends Authenticatable implements MustVerifyEmail
     /** @use HasFactory<UserFactory> */
     use HasApiTokens, HasFactory, Notifiable;
 
+    /**
+     * Mirrors the column default so a freshly created model reports the flag
+     * rather than null.
+     *
+     * @var array<string, mixed>
+     */
+    protected $attributes = ['is_system_admin' => false];
+
     /** @return array<string, string> */
     protected function casts(): array
     {
@@ -45,6 +54,9 @@ class User extends Authenticatable implements MustVerifyEmail
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'is_first_time_register' => 'boolean',
+            // Deliberately absent from #[Fillable]: granted only by
+            // `php artisan magecode:make-system-admin`, never by a request.
+            'is_system_admin' => 'boolean',
         ];
     }
 

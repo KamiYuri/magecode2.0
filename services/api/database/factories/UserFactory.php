@@ -30,6 +30,7 @@ class UserFactory extends Factory
             'avatar_path' => null,
             'email_verified_at' => now(),
             'is_first_time_register' => false,
+            'is_system_admin' => false,
         ];
     }
 
@@ -38,6 +39,12 @@ class UserFactory extends Factory
         return $this->state(fn (): array => [
             'student_id' => (string) fake()->unique()->numberBetween(20210000, 20259999),
         ]);
+    }
+
+    /** Platform administrator (D-12); granted only by artisan in production. */
+    public function systemAdmin(): static
+    {
+        return $this->state(fn (): array => ['is_system_admin' => true]);
     }
 
     public function unverified(): static
