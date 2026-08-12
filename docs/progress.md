@@ -17,7 +17,7 @@
 | A3 apperror | P0 | done | `3c32d1b` | outermost classification wins; unclassified errors are neither (consumer picks default) |
 | A4 rmq | P0 | done | `fd47c34` | topology Q/Q.retry/Q.dlq; retry via republish + per-message TTL; integration suite: `go test -tags integration` (needs compose rabbitmq + RMQ_TEST_URL) |
 | A5 db | P0 | done | `330280b` | simple_protocol enforced + conflicting mode rejected; integration via pgbouncer :6432 (DB_TEST_DSN) |
-| A6 storage | P0 | wip | `shared/feat/storage` | — |
+| A6 storage | P0 | done | `7215b0e` | presign verified credential-free + expiry 403; integration needs MINIO_TEST_* env |
 | A7 scaffolds + go.work | P0 | todo | — | — |
 
 ## M1 — Plan B: API Core
@@ -129,3 +129,4 @@
 | 2026-08-11 | infra | Deployed compose infra + observability (postgres, pgbouncer, rabbitmq, minio, loki, prometheus, grafana, exporters); Loki docker plugin installed. Known issues: `php-fpm-exporter` has hard `depends_on: api` breaking `--profile observability` alone (workaround: start services by name; fix on an `infra/` branch); Prometheus `minio` target down (metrics auth config, revisit in G1). |
 | 2026-08-11 | A4 | done — `shared/go/rmq` publisher/consumer, 7 unit + 4 integration tests green vs compose RabbitMQ, merged to `shared/dev`. M0 smoke pub/sub requirement covered by roundtrip integration test. |
 | 2026-08-11 | A5 | done — `shared/go/db` sqlx+pgx pool, 6 unit + 5 integration tests green vs compose pgbouncer, merged to `shared/dev`. Included `fix(infra)`: postgres conf lacked `listen_addresses='*'`, pgbouncer upstream was down. |
+| 2026-08-11 | A6 | done — `shared/go/storage` minio client, 7 unit + 5 integration tests green vs compose minio, merged to `shared/dev`. |
