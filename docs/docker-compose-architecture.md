@@ -966,6 +966,10 @@ services:
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      # Prometheus scrapes /minio/v2/metrics/cluster, which demands a bearer
+      # JWT unless auth is public. Revisit in G3: metrics ride the same :9000
+      # port as the API, so "public" also exposes them on the published port.
+      MINIO_PROMETHEUS_AUTH_TYPE: public
     volumes:
       - minio-data:/data
     networks:
@@ -1136,8 +1140,9 @@ services:
     networks:
       - monitoring
       - backend
-    depends_on:
-      - api
+    # No depends_on api: api belongs to the app/full profiles, so requiring it
+    # makes `--profile observability` alone an invalid project. The exporter
+    # polls and simply reports the target down until api is up.
     restart: unless-stopped
 
 # ══════════════════════════════════════════════
