@@ -1,0 +1,2 @@
+# Runtime dependencies land with Plan E tasks (E4 pika, E5 transformers/torch).
+# Kept empty in the A7 scaffold so the image stays minimal.
