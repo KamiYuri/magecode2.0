@@ -55,14 +55,18 @@ composer-api: api-image
 	$(API_RUN) composer $(args)
 
 # ── Database ──
-migrate:
-	cd services/api && php artisan migrate
+# Run through the api image against PgBouncer: the host PHP has no pdo_pgsql.
+DB_RUN = docker run --rm --network magecode-backend -v $(PWD)/services/api:/var/www/html \
+	-e DB_HOST=pgbouncer -e DB_PORT=6432 magecode-api:test
 
-seed:
-	cd services/api && php artisan db:seed
+migrate: api-image
+	$(DB_RUN) php artisan migrate --force
 
-fresh:
-	cd services/api && php artisan migrate:fresh --seed
+seed: api-image
+	$(DB_RUN) php artisan db:seed --force
+
+fresh: api-image
+	$(DB_RUN) php artisan migrate:fresh --seed --force
 
 # ── Logs ──
 logs:

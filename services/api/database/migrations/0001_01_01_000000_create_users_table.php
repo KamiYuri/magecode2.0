@@ -13,13 +13,18 @@ return new class extends Migration
      */
     public function up(): void
     {
+        // Roles live in the membership tables, never on users (schema §2.1).
         Schema::create('users', function (Blueprint $table) {
             $table->id();
-            $table->string('name');
+            $table->string('username', 50)->unique();
             $table->string('email')->unique();
-            $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
-            $table->rememberToken();
+            $table->string('first_name', 100);
+            $table->string('last_name', 100);
+            $table->string('student_id', 20)->unique()->nullable();
+            $table->string('avatar_path', 500)->nullable();
+            $table->timestamp('email_verified_at')->nullable();
+            $table->boolean('is_first_time_register')->default(false);
             $table->timestamps();
         });
 
