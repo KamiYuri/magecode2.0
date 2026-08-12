@@ -91,15 +91,26 @@ Deviating from a D-decision requires recording an amendment row in
 ```bash
 cp .env.example .env          # first time only — fill passwords
 make up                       # infrastructure: postgres, pgbouncer, rabbitmq, minio, loki
-make migrate && make seed     # once services/api exists
+make migrate && make seed     # runs in the api image against PgBouncer; seed is idempotent
+make test-api && make lint-api  # api suite + pint/phpstan, also in the image
 make up-judge0                # only for CES work (needs cgroup v1 — see docker-compose-architecture §17)
 make status                   # container health
 make logs service=<name>      # tail one service
 ```
 
-Local dev servers: `make dev-api` (:8000), `make dev-web` (:5173), `make dev-reverb` (:8080).
-Go workers: `cd services/<name> && go run ./cmd/main.go`. Slow integration suites
-(Judge0/CodeBERT/CodeQL) run only under their explicit tag/group — keep the default loop fast.
+**PHP runs in Docker, not on the host.** Every `make *-api` target executes inside
+`magecode-api:test`, because the api needs the `pdo_pgsql` and `amqp` extensions. Only
+`make dev-api` / `make dev-reverb` (:8000/:8080) call host PHP and therefore need those
+extensions installed locally. `make dev-web` (:5173) needs Node.
+
+Application containers declare the Loki log driver (D-88), so install the plugin before
+`--profile app`/`analysis`:
+`docker plugin install grafana/loki-docker-driver:latest --alias loki --grant-all-permissions`.
+
+Go: `cd shared/go && go test ./...` for units. Integration suites are behind
+`-tags integration` and skip unless their env var is set — `RMQ_TEST_URL`, `DB_TEST_DSN`,
+`MINIO_TEST_ENDPOINT` (+ key/secret/bucket). Slow suites (Judge0/CodeBERT/CodeQL) run only
+under their explicit tag/group — keep the default loop fast.
 
 ## 7. Language Rules
 

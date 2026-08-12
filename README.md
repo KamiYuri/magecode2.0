@@ -61,18 +61,20 @@ MageCode is a microservices-based platform for automated code assessment. Studen
 
 | Service | Tool | Version | Install |
 |---------|------|---------|---------|
-| `api`, `reverb` | PHP | ≥ 8.4 | `sudo apt install php8.4-cli php8.4-pgsql php8.4-mbstring php8.4-xml php8.4-zip php8.4-bcmath php8.4-intl php8.4-curl` |
-| `api`, `reverb` | Composer | 2.x | [getcomposer.org](https://getcomposer.org/download/) |
+| `api`, `reverb` | PHP | ≥ 8.3 (containers run 8.4) | `sudo apt install php8.4-cli php8.4-pgsql php8.4-amqp php8.4-mbstring php8.4-xml php8.4-zip php8.4-bcmath php8.4-intl php8.4-curl` — only needed for `make dev-api`/`dev-reverb`; `pdo_pgsql` and `amqp` are mandatory |
+| `api`, `reverb` | Composer | 2.x | Optional — `make composer-api` runs it in the image |
 | `web` | Node.js | ^20.19 or ≥22.12 | [nodejs.org](https://nodejs.org/) or `nvm install 22` |
 | `web` | npm | ≥ 10 | Bundled with Node.js |
 | `code-executor`, `plagiarism-checker`, `vuln-scanner` | Go | 1.26+ | [go.dev/dl](https://go.dev/dl/) |
 | `ai-detector` | Python | ≥ 3.12 | `sudo apt install python3.12 python3.12-venv` |
 
-### Optional
+### Required before any `--profile app` / `--profile analysis` container starts
 
 | Tool | Purpose | Install |
 |------|---------|---------|
-| Loki Docker driver | Ship container logs to Grafana Loki | `docker plugin install grafana/loki-docker-driver:3-amd64 --alias loki --grant-all-permissions` |
+| Loki Docker driver | Application containers declare `logging.driver: loki` (D-88), so Docker refuses to start them until the plugin exists | `docker plugin install grafana/loki-docker-driver:latest --alias loki --grant-all-permissions` |
+
+Infrastructure containers (`make up`) do not use the driver and start without it.
 
 ## Quick Start (Development)
 
@@ -85,20 +87,30 @@ cp .env.example .env
 make up
 # Starts: postgres, pgbouncer, rabbitmq, minio, loki (6 containers)
 
-# 3. Run Laravel migrations
+# 3. Run Laravel migrations (executes inside the api image, against PgBouncer)
 make migrate
 
-# 4. Seed database (optional)
+# 4. Seed database — idempotent, safe to re-run
 make seed
 
-# 5. Start application services on host
+# 5. API quality gates (also run in the api image)
+make test-api     # php artisan test against the magecode_test database
+make lint-api     # pint --test + phpstan
+make composer-api args="require foo/bar"
+
+# 6. Start application services on host (needs host toolchains, see below)
 make dev-api      # Laravel dev server → localhost:8000
 make dev-web      # Vite HMR          → localhost:5173
 make dev-reverb   # WebSocket server  → localhost:8080
 
-# 6. (Optional) Start Judge0 for code execution
+# 7. (Optional) Start Judge0 for code execution
 make up-judge0
 ```
+
+> **PHP on the host is optional.** Every `make *-api` target runs in the `magecode-api:test`
+> image, so migrations, tests and linters work with Docker alone. `make dev-api` and
+> `make dev-reverb` are the exceptions: they run `php artisan` directly and therefore need a
+> host PHP with the `pdo_pgsql` and `amqp` extensions.
 
 ## Docker Compose Profiles
 
@@ -132,6 +144,7 @@ Infrastructure          Local Dev              Database
 ─────────────          ──────────             ────────
 make up                make dev-api           make migrate
 make up-app            make dev-web           make seed
+make test-api          make lint-api          make composer-api
 make up-analysis       make dev-reverb        make fresh
 make up-full
 make up-judge0         Monitoring             Maintenance
