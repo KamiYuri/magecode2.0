@@ -26,7 +26,7 @@
 |---|---|---|---|---|
 | B1 laravel skeleton | P0 | done | `5ce6da2` | PHP commands run in Docker (`make test-api`/`lint-api`): host PHP lacks pdo_pgsql+amqp. phpstan level 6 |
 | B2 migrations | P0 | done | `c15faea` | Spatie tables dropped (U-2); `chk_analysis_scope` uses doc's OR not prototype's XOR — **needs your call**, see session log |
-| B3 models + seeders | P0 | wip | `api/feat/models` | — |
+| B3 models + seeders | P0 | done | `512e2c3` | 11 backed enums added from schema §10; factories encode CHECK invariants; models carry `@property` for phpstan |
 | B4 auth | P0 | todo | — | — |
 | B5 rbac + policies | P0 | todo | — | privacy-tagged: authz matrix gates M1 |
 | B6 org/course/semester/section crud | P0 | todo | — | — |
@@ -130,6 +130,8 @@
 | 2026-08-11 | A4 | done — `shared/go/rmq` publisher/consumer, 7 unit + 4 integration tests green vs compose RabbitMQ, merged to `shared/dev`. M0 smoke pub/sub requirement covered by roundtrip integration test. |
 | 2026-08-11 | A5 | done — `shared/go/db` sqlx+pgx pool, 6 unit + 5 integration tests green vs compose pgbouncer, merged to `shared/dev`. Included `fix(infra)`: postgres conf lacked `listen_addresses='*'`, pgbouncer upstream was down. |
 | 2026-08-11 | A6 | done — `shared/go/storage` minio client, 7 unit + 5 integration tests green vs compose minio, merged to `shared/dev`. |
+| 2026-08-12 | REST vs GraphQL | Evaluated before B3 and rejected; recorded as **D-91** in decisions-v3 §7 with revisit conditions. Fixed the real gap it exposed (`?include=` had no declared values) plus two doc inconsistencies (D-46 endpoint spelling, B11 paths-vs-operations criterion). |
+| 2026-08-12 | B3 | done — 22 models + 22 factories + 3 seeders, 48 tests green (395 assertions), pint + phpstan(6) clean, `make seed` idempotent against compose Postgres (5 users / 4 languages / 4 members unchanged on re-run). Added 11 backed enums from schema §10 — B5 should resolve roles through `OrganizationRole`/`SectionRole` rather than strings. Prototype's `CodeExecutionResult.updated_at` dropped (not in final schema). |
 | 2026-08-12 | B2 | done — 20 migrations (27 domain tables) written from `database-schema.md`, 15 schema-conformance tests + 4 health tests green, `make migrate` clean on compose Postgres via PgBouncer (36 tables, both CHECKs, both partial unique indexes). **Open question for the human**: the doc's `chk_analysis_scope` is OR ("at least one scope identifier") while the prototype used XOR; scope-resolution pseudocode and `problems.manual_match_group_id` semantics both suggest XOR is intended. Implemented OR per SoT hierarchy — if XOR is wanted, amend `database-schema.md` §5.2 first, then the migration. |
 | 2026-08-12 | B1 | done — Laravel 13.25 skeleton in `services/api`, 6 tests + pint + phpstan(6) green, `/api/v1/health` 200 through nginx+FPM+PgBouncer in a real container. Two infra bugs fixed on the way: PgBouncer listened on 5432 while everything dialled 6432 (`dd31cef`), and the nginx health location resolved a doubled `public/` path. Note: host PHP 8.3 has no pdo_pgsql/amqp, so `make dev-api` needs those extensions — use `make test-api`/`lint-api` (Docker) meanwhile. |
 | 2026-08-12 | A7, M0 gate | done — worker scaffolds + ai-detector skeleton + go.work fixed (`GOWORK=off` no longer needed); Go images 23.8MB; `--profile analysis config` valid. M0 exit PASS: all unit + integration suites green, container-level pub/sub smoke OK. Next: M1/B1 (Laravel skeleton). |
