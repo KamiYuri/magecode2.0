@@ -18,7 +18,7 @@ class SchemaConformanceTest extends TestCase
 {
     use RefreshDatabase;
 
-    /** Section 1.3: 34 tables, plus Sanctum's personal_access_tokens. */
+    /** Section 1.3: 35 tables. */
     private const DOCUMENTED_TABLES = [
         'users', 'organizations', 'courses', 'semesters', 'sections', 'problems', 'submissions',
         'test_cases', 'programming_languages',
@@ -31,7 +31,7 @@ class SchemaConformanceTest extends TestCase
         'problem_edit_logs', 'section_transfer_logs',
         'notifications',
         'password_reset_tokens', 'sessions', 'cache', 'cache_locks',
-        'jobs', 'job_batches', 'failed_jobs',
+        'jobs', 'job_batches', 'failed_jobs', 'personal_access_tokens',
     ];
 
     /**
