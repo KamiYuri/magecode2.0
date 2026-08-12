@@ -1,0 +1,9 @@
+[project]
+name = "ai-detector"
+version = "0.1.0"
+description = "MageCode AI-generated code detection worker (CodeBERT)"
+requires-python = ">=3.12"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
