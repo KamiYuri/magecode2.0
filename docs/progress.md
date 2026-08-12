@@ -27,7 +27,7 @@
 | B1 laravel skeleton | P0 | done | `5ce6da2` | PHP commands run in Docker (`make test-api`/`lint-api`): host PHP lacks pdo_pgsql+amqp. phpstan level 6 |
 | B2 migrations | P0 | done | `c15faea` | Spatie tables dropped (U-2); `chk_analysis_scope` uses doc's OR not prototype's XOR — **needs your call**, see session log |
 | B3 models + seeders | P0 | done | `512e2c3` | 11 backed enums added from schema §10; factories encode CHECK invariants; models carry `@property` for phpstan |
-| B4 auth | P0 | todo | — | — |
+| B4 auth | P0 | wip | `api/feat/auth` | — |
 | B5 rbac + policies | P0 | todo | — | privacy-tagged: authz matrix gates M1 |
 | B6 org/course/semester/section crud | P0 | todo | — | — |
 | B7 roster import + transfer | P1 | todo | — | — |
