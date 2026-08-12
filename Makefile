@@ -37,6 +37,23 @@ dev-web:
 dev-reverb:
 	cd services/api && php artisan reverb:start --port=8080 $(if $(debug),--debug,)
 
+# ── API quality gates (run in Docker: host PHP lacks pdo_pgsql/amqp) ──
+API_RUN = docker run --rm --network magecode-backend -v $(PWD)/services/api:/var/www/html \
+	-e DB_HOST=postgres -e DB_PORT=5432 magecode-api:test
+
+api-image:
+	docker build --target test -t magecode-api:test services/api
+
+test-api: api-image
+	$(API_RUN) php artisan test
+
+lint-api: api-image
+	$(API_RUN) ./vendor/bin/pint --test
+	$(API_RUN) ./vendor/bin/phpstan analyse --no-progress --memory-limit=512M
+
+composer-api: api-image
+	$(API_RUN) composer $(args)
+
 # ── Database ──
 migrate:
 	cd services/api && php artisan migrate
