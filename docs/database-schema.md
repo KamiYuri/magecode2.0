@@ -82,7 +82,9 @@ Default: **RESTRICT** — block parent deletion if child records exist.
 
 ### 2.1. users
 
-All authenticated users. Roles are assigned through membership tables, not on this table.
+All authenticated users. Roles are assigned through membership tables, not on this table —
+with one exception: System Admin is platform-scoped and therefore cannot be expressed as a
+membership of any organization or section, so it lives in `is_system_admin`.
 
 **Eloquent Model**: `App\Models\User` — uses `HasFactory`, `Notifiable`. No `SoftDeletes`.
 
@@ -98,6 +100,7 @@ Schema::create('users', function (Blueprint $table) {
     $table->string('avatar_path', 500)->nullable();
     $table->timestamp('email_verified_at')->nullable();
     $table->boolean('is_first_time_register')->default(false);
+    $table->boolean('is_system_admin')->default(false);
     $table->timestamps();
 });
 ```
@@ -114,6 +117,7 @@ Schema::create('users', function (Blueprint $table) {
 | avatar_path | `string('avatar_path', 500)` | NULLABLE | MinIO path |
 | email_verified_at | `timestamp(...)` | NULLABLE | |
 | is_first_time_register | `boolean(...)` | DEFAULT false | Onboarding flag |
+| is_system_admin | `boolean(...)` | DEFAULT false | D-12 System Admin. Platform scope sits above organizations, so no membership row can express it. Set by `php artisan magecode:make-system-admin`, never through the API |
 | created_at | `timestamps()` | NOT NULL | |
 | updated_at | `timestamps()` | NOT NULL | |
 

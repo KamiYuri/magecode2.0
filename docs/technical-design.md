@@ -109,7 +109,7 @@ Problem Bank belongs to Course and operates on a fork model:
 | System Admin | Entire platform | Bootstrap and manage Organizations, assign Org Admins, platform configuration. Operates above the Organization scope |
 | Organization Admin | Entire Organization | Manage Courses, full cross-section visibility, set Semester policies, manage Problem Bank approvals |
 | Instructor | Assigned Sections | Create/edit Problems, trigger analysis, view submissions in own sections, clone from Problem Bank |
-| Teaching Assistant | Assigned Sections | View submissions, assist grading. Optional per Section. Cannot create Problems or trigger analysis (unless Instructor permits) |
+| Teaching Assistant | Assigned Sections | View submissions and CES execution results, assist grading. Optional per Section. Cannot create Problems, cannot trigger analysis, and cannot read analysis results (SIM/AID/VUL) |
 | Student | Own Section | View problems (when published), submit code, view own results |
 
 ### 3.2. Isolation Model
@@ -147,8 +147,8 @@ SIM always runs comparison across the entire Semester (all sections with equival
 
 | Tier | Who Sees | Sees What | Does NOT See |
 |---|---|---|---|
-| Within-Section | Instructor / TA | Both student names, both code sides, % similarity, highlight regions | — |
-| Cross-Section | Instructor / TA | Other student name, % similarity, own student's code + highlight | Other student's code |
+| Within-Section | Instructor | Both student names, both code sides, % similarity, highlight regions | — |
+| Cross-Section | Instructor | Other student name, % similarity, own student's code + highlight | Other student's code |
 | Full Detail | Org Admin | Everything: names, sections, both code sides | — |
 
 - Instructor has a "Report to Org Admin" button for escalation when needed
