@@ -44,7 +44,7 @@
 
 | # | Decision | Conclusion | Schema/Implementation Impact |
 |---|---|---|---|
-| **D-46** | Analysis trigger timing | Manual trigger by GV/Org Admin after problem locked | API endpoint: `POST /api/problems/{id}/analyze` |
+| **D-46** | Analysis trigger timing | Manual trigger by GV/Org Admin after problem locked | API endpoint: `POST /api/v1/problems/{problem_id}/analysis` |
 | **D-47** | Cross-section problem matching (auto) | Same `bank_problem_id` = equivalent problems | `problems.bank_problem_id` FK auto-groups problems cloned from same bank entry |
 | **D-48** | Analysis scope for SIM | Semester-level, all equivalent problems | `analysis_problems.semester_id` (not per-problem). "Phương án B" design |
 | **D-49** | Latest submission per student | Only 1 submission per student enters analysis | `SELECT DISTINCT ON (creator_id) ... ORDER BY created_at DESC` |

@@ -15,7 +15,12 @@ This document records 10 new infrastructure decisions (D-80 through D-89) made d
 | Architecture (D-01–D-33) | Tech stack, domain, services | 33 |
 | Decision Log v1 + v2 (D-34–D-79e) | Submission, analysis, bank, infra | 75 |
 | Decision Log v3 (D-80–D-89) | Inter-service communication | 10 |
-| **TOTAL** | | **118** |
+| Later additions (D-90, D-91) | Judge0 isolation, client API style | 2 |
+| **TOTAL** | | **120** |
+
+> **D-90** is recorded in `docs/docker-compose-architecture.md` §15 (Judge0 CE in its own
+> compose file because it needs `privileged: true`), not here. **D-91** (REST as the client
+> API style) is recorded in the amendments table in §7.
 
 **Open questions remaining:** 0
 
@@ -258,6 +263,8 @@ Original text is updated inline; this table records what changed and why.
 | 2026-08-10 | D-10 | Laravel 12 → 13, PHP 8.3 → 8.4, Go 1.22 → 1.26, Python 3.11 → 3.12 | D-10's rationale is "latest version"; Laravel 13 + PHP 8.4 validated by the deprecated 2.0 prototype. See `docs/superpowers/plans/2026-08-10-magecode-2.0-upgrade-roadmap.md` (U-1) |
 | 2026-08-10 | D-85, D-79c | Pre-signed URL TTL 2h → 6h | `rabbitmq-schemas.md` §2.6 (final Phase 1 deliverable) already specified 6h to cover max queue wait + 30-min analysis timeout + buffer; decision logs and technical-design brought in line (U-4) |
 | 2026-08-10 | D-12 | 4 roles → 5 roles (adds System Admin) | `openapi.yml` already defines System Admin for platform bootstrap (creating Organizations, assigning Org Admins); technical-design §3 and decision logs unified (U-5) |
+| 2026-08-12 | **D-91** (new) | Client API style is **REST over HTTP**, contract in `openapi.yml`; GraphQL evaluated and rejected | REST was assumed project-wide but never decided, so this closes the gap rather than changing course. GraphQL was assessed before B3: it targets over-fetching we do not have (3 of 37 GETs use `include`), while it weakens the three privacy-gated P0s — B5's `role × endpoint × status` matrix becomes `role × field`, and D-05/D-06 cross-section redaction must hold against arbitrary client-chosen field sets. It also breaks HTTP-shaped commitments already made: G4's `zero 5xx` threshold (GraphQL returns 200 with in-body errors), per-route metrics behind Traefik path routing (D-86, G1/G2), and route-level rate limits (U-3). Uploads/exports (4 multipart + 2 binary) would stay REST regardless, so the result is a hybrid. Cost: rewriting `openapi.yml` (2596 lines) plus B4–B12, C2, D8, F2, F8, F9, B11 and two milestone gates. **Revisit when** a second client with different payload needs appears, or M4 measures over-fetch/round-trips as a real bottleneck, or `include` spreads past ~10 operations |
+| 2026-08-12 | D-46 | Endpoint corrected to `POST /api/v1/problems/{problem_id}/analysis` | Three documents spelled the same endpoint three ways: D-46 had the unversioned `POST /api/problems/{id}/analyze`, while `openapi.yml` and roadmap D1 use `/problems/{problem_id}/analysis`. `openapi.yml` outranks the decision log for endpoint shape |
 
 ---
 
