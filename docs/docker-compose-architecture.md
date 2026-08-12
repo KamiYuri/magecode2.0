@@ -967,8 +967,10 @@ services:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
       # Prometheus scrapes /minio/v2/metrics/cluster, which demands a bearer
-      # JWT unless auth is public. Revisit in G3: metrics ride the same :9000
-      # port as the API, so "public" also exposes them on the published port.
+      # JWT unless auth is public. Safe here only because those metrics ride
+      # the same :9000 port as the S3 API and that port is bound to loopback
+      # below — Prometheus reaches minio:9000 over the monitoring network.
+      # G3: switch to token auth before anything binds :9000 more widely.
       MINIO_PROMETHEUS_AUTH_TYPE: public
     volumes:
       - minio-data:/data
@@ -976,6 +978,10 @@ services:
       - backend
       - monitoring
     ports:
+      # Loopback only: the S3 API also serves unauthenticated Prometheus
+      # metrics (see MINIO_PROMETHEUS_AUTH_TYPE above). Host access exists for
+      # the storage integration tests; services use minio:9000 internally.
+      - "127.0.0.1:9000:9000"                 # S3 API (host-run tests only)
       - "${MINIO_CONSOLE_PORT:-9001}:9001"    # Console UI (dev)
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
