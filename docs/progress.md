@@ -25,7 +25,7 @@
 | Task | Prio | Status | Ref | Notes |
 |---|---|---|---|---|
 | B1 laravel skeleton | P0 | done | `5ce6da2` | PHP commands run in Docker (`make test-api`/`lint-api`): host PHP lacks pdo_pgsql+amqp. phpstan level 6 |
-| B2 migrations | P0 | todo | — | — |
+| B2 migrations | P0 | wip | `api/feat/migrations` | — |
 | B3 models + seeders | P0 | todo | — | — |
 | B4 auth | P0 | todo | — | — |
 | B5 rbac + policies | P0 | todo | — | privacy-tagged: authz matrix gates M1 |
