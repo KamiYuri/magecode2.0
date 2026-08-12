@@ -255,7 +255,8 @@ class SchemaConformanceTest extends TestCase
     {
         $expected = [
             'avatar_path', 'created_at', 'email', 'email_verified_at', 'first_name', 'id',
-            'is_first_time_register', 'last_name', 'password', 'student_id', 'updated_at', 'username',
+            'is_first_time_register', 'is_system_admin', 'last_name', 'password', 'student_id',
+            'updated_at', 'username',
         ];
 
         $this->assertSame($expected, $this->columnsOf('users'));
