@@ -25,8 +25,10 @@ info:
     - **Soft-deleted** records are excluded by default. Use `?with_trashed=true` where supported.
     - **Timestamps**: ISO 8601 UTC (`2026-03-18T10:00:00Z`).
     - **IDs**: Unsigned BIGINT, returned as integers in JSON.
-    - **Include pattern**: Use `?include=relation1,relation2` on GET endpoints to control eager loading.
-      Default includes vary per endpoint (documented on each). Omit for minimal payload.
+    - **Include pattern**: Use `?include=relation1,relation2` on the GET endpoints that declare it.
+      Each such operation enumerates the relations it accepts as an enum; anything else is a 422.
+      Omit for the minimal payload. An include never widens authorization — server-side
+      redaction (D-05/D-06) applies to the expanded fields exactly as it does to the base payload.
     - **URL convention**: Nested POST for creation (`POST /sections/{id}/problems`),
       flat GET/PUT/DELETE for single resource (`GET /problems/{id}`). Documented consistently.
 
@@ -195,7 +197,11 @@ components:
       in: query
       required: false
       schema: { type: string }
-      description: "Comma-separated relations to include. Available values vary per endpoint."
+      description: >-
+        Deprecated shared definition — kept for reference only. Operations that
+        support eager loading declare `include` inline with the exact set of
+        relations they accept, so the allowed values are machine-readable.
+      deprecated: true
 
   responses:
     Unauthenticated:
@@ -1747,7 +1753,15 @@ paths:
         - $ref: '#/components/parameters/PathSectionId'
         - { name: group_label, in: query, schema: { type: string } }
         - { name: difficulty, in: query, schema: { type: string, enum: [easy, medium, hard] } }
-        - $ref: '#/components/parameters/QueryInclude'
+        - name: include
+          in: query
+          required: false
+          description: "Relations to eager-load. Omit for the minimal payload."
+          style: form
+          explode: false
+          schema:
+            type: array
+            items: { type: string, enum: [programming_languages, tags, creator] }
       responses:
         '200':
           content:
@@ -1817,7 +1831,17 @@ paths:
       operationId: getProblem
       parameters:
         - $ref: '#/components/parameters/PathProblemId'
-        - $ref: '#/components/parameters/QueryInclude'
+        - name: include
+          in: query
+          required: false
+          description: >-
+            Relations to eager-load. `test_cases` is honoured only for staff;
+            students requesting it still receive the Problem shape.
+          style: form
+          explode: false
+          schema:
+            type: array
+            items: { type: string, enum: [test_cases, programming_languages, tags, creator] }
       responses:
         '200':
           content:
@@ -2140,7 +2164,18 @@ paths:
         - $ref: '#/components/parameters/QueryCursor'
         - $ref: '#/components/parameters/QueryPerPage'
         - { name: section_id, in: query, schema: { type: integer, format: int64 } }
-        - $ref: '#/components/parameters/QueryInclude'
+        - name: include
+          in: query
+          required: false
+          description: >-
+            Relations to eager-load. `source_code` never bypasses two-tier
+            redaction (D-05/D-06): for a cross-section pair the field is
+            returned as null regardless of this parameter.
+          style: form
+          explode: false
+          schema:
+            type: array
+            items: { type: string, enum: [source_code, submission, student] }
       responses:
         '200':
           content:
