@@ -27,7 +27,7 @@
 | B1 laravel skeleton | P0 | done | `5ce6da2` | PHP commands run in Docker (`make test-api`/`lint-api`): host PHP lacks pdo_pgsql+amqp. phpstan level 6 |
 | B2 migrations | P0 | done | `c15faea` | Spatie tables dropped (U-2); `chk_analysis_scope` uses doc's OR not prototype's XOR — **needs your call**, see session log |
 | B3 models + seeders | P0 | done | `512e2c3` | 11 backed enums added from schema §10; factories encode CHECK invariants; models carry `@property` for phpstan |
-| B4 auth | P0 | wip | `api/feat/auth` | — |
+| B4 auth | P0 | done | `5005c64` | email verify is unauthenticated (signed link + hash check); reset revokes all tokens, logout only the current one |
 | B5 rbac + policies | P0 | todo | — | privacy-tagged: authz matrix gates M1 |
 | B6 org/course/semester/section crud | P0 | todo | — | — |
 | B7 roster import + transfer | P1 | todo | — | — |
@@ -130,6 +130,7 @@
 | 2026-08-11 | A4 | done — `shared/go/rmq` publisher/consumer, 7 unit + 4 integration tests green vs compose RabbitMQ, merged to `shared/dev`. M0 smoke pub/sub requirement covered by roundtrip integration test. |
 | 2026-08-11 | A5 | done — `shared/go/db` sqlx+pgx pool, 6 unit + 5 integration tests green vs compose pgbouncer, merged to `shared/dev`. Included `fix(infra)`: postgres conf lacked `listen_addresses='*'`, pgbouncer upstream was down. |
 | 2026-08-11 | A6 | done — `shared/go/storage` minio client, 7 unit + 5 integration tests green vs compose minio, merged to `shared/dev`. |
+| 2026-08-12 | B4 | done — 7 auth endpoints, 86 tests green (522 assertions), pint + phpstan clean. `User` now implements `MustVerifyEmail`. Auth throttle (10/min/IP) registered as the `auth` limiter in `AppServiceProvider`; the global `api` limiter (120/min) is defined there too but not yet attached to routes — B11 wires it. |
 | 2026-08-12 | infra fixes | All four compose profiles now validate (`observability` was invalid on its own) and every infrastructure Prometheus target is up: postgres, pgbouncer, rabbitmq, minio. Remaining `down` targets are services not yet running (api, traefik, the four workers); the Go workers additionally have no `/metrics` until G1. Open for G3: MinIO metrics are public on the same port the API listens on. |
 | 2026-08-12 | REST vs GraphQL | Evaluated before B3 and rejected; recorded as **D-91** in decisions-v3 §7 with revisit conditions. Fixed the real gap it exposed (`?include=` had no declared values) plus two doc inconsistencies (D-46 endpoint spelling, B11 paths-vs-operations criterion). |
 | 2026-08-12 | B3 | done — 22 models + 22 factories + 3 seeders, 48 tests green (395 assertions), pint + phpstan(6) clean, `make seed` idempotent against compose Postgres (5 users / 4 languages / 4 members unchanged on re-run). Added 11 backed enums from schema §10 — B5 should resolve roles through `OrganizationRole`/`SectionRole` rather than strings. Prototype's `CodeExecutionResult.updated_at` dropped (not in final schema). |
