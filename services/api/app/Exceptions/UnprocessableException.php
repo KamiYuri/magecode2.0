@@ -21,6 +21,24 @@ final class UnprocessableException extends ApiException
         );
     }
 
+    /** D-51: one section of a course per semester, per student. */
+    public static function duplicateEnrollment(string $section): self
+    {
+        return new self(
+            'DUPLICATE_ENROLLMENT',
+            "This student is already enrolled in section {$section} of the same course this semester."
+        );
+    }
+
+    /** The target section belongs to a different semester (D-50). */
+    public static function transferOutsideSemester(): self
+    {
+        return new self(
+            'TRANSFER_OUTSIDE_SEMESTER',
+            'A student can only be transferred to another section of the same semester.'
+        );
+    }
+
     /** The semester forbids per-problem overrides and the caller is not an Org Admin. */
     public static function policyOverrideDenied(): self
     {

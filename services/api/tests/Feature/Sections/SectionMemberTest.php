@@ -195,17 +195,21 @@ class SectionMemberTest extends TestCase
 
     public function test_promoting_to_student_re_checks_the_duplicate_rule(): void
     {
+        // Assisting L01 while studying L02 is allowed; becoming a student of
+        // both is exactly what D-51 forbids, so the role change has to ask.
         $sibling = $this->sectionIn($this->semester, ['name' => 'L02']);
-        $teacher = $this->sectionMember($sibling, SectionRole::Instructor);
-        $membership = SectionMember::factory()->instructor()->create([
+        $student = $this->sectionMember($sibling, SectionRole::Student);
+        $membership = SectionMember::factory()->ta()->create([
             'section_id' => $this->section->id,
-            'user_id' => $teacher->id,
+            'user_id' => $student->id,
         ]);
         Sanctum::actingAs($this->orgAdmin);
 
         $this->putJson("/api/v1/sections/{$this->section->id}/members/{$membership->id}", ['role' => 'student'])
             ->assertUnprocessable()
             ->assertJsonPath('code', 'DUPLICATE_ENROLLMENT');
+
+        $this->assertSame(SectionRole::Ta, $membership->fresh()?->role);
     }
 
     public function test_a_member_is_removed(): void

@@ -12,6 +12,7 @@ use App\Http\Controllers\OrganizationController;
 use App\Http\Controllers\OrganizationMemberController;
 use App\Http\Controllers\ProblemController;
 use App\Http\Controllers\SectionController;
+use App\Http\Controllers\SectionMemberController;
 use App\Http\Controllers\SemesterController;
 use App\Http\Controllers\TestCaseController;
 use Illuminate\Support\Facades\Route;
@@ -90,6 +91,17 @@ Route::prefix('v1')->group(function (): void {
             ->name('semesters.sections.store');
         Route::get('sections/{section}', [SectionController::class, 'show'])->name('sections.show');
         Route::put('sections/{section}', [SectionController::class, 'update'])->name('sections.update');
+
+        Route::scopeBindings()->group(function (): void {
+            Route::get('sections/{section}/members', [SectionMemberController::class, 'index'])
+                ->name('sections.members.index');
+            Route::post('sections/{section}/members', [SectionMemberController::class, 'store'])
+                ->name('sections.members.store');
+            Route::put('sections/{section}/members/{member}', [SectionMemberController::class, 'update'])
+                ->name('sections.members.update');
+            Route::delete('sections/{section}/members/{member}', [SectionMemberController::class, 'destroy'])
+                ->name('sections.members.destroy');
+        });
 
         Route::get('sections/{section}/problems', [ProblemController::class, 'index'])
             ->name('sections.problems.index');

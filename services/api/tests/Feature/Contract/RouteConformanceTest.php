@@ -49,11 +49,7 @@ class RouteConformanceTest extends TestCase
      */
     private const PENDING = [
         'B7 section roster' => [
-            'GET /sections/{}/members',
-            'POST /sections/{}/members',
             'POST /sections/{}/members/import',
-            'PUT /sections/{}/members/{}',
-            'DELETE /sections/{}/members/{}',
             'POST /sections/{}/members/{}/transfer',
         ],
         'B9 tags' => [
