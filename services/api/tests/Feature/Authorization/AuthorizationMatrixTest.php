@@ -57,10 +57,27 @@ class AuthorizationMatrixTest extends TestCase
             ['instructorL01', 'create', 'organization', false],
             ['student', 'create', 'organization', false],
             ['orgAdmin', 'update', 'organization', true],
+            ['systemAdmin', 'update', 'organization', true],
             ['instructorL01', 'update', 'organization', false],
             ['orgAdmin', 'view', 'organization', true],
             ['instructorL01', 'view', 'organization', true],
             ['outsider', 'view', 'organization', false],
+            // Managing an organization is deliberately wider than reading it:
+            // the System Admin bootstraps and assigns Org Admins (v1 §4.1),
+            // but membership is still what grants sight of anything inside.
+            ['systemAdmin', 'view', 'organization', false],
+            ['orgAdmin', 'manageMembers', 'organization', true],
+            ['systemAdmin', 'manageMembers', 'organization', true],
+            ['instructorL01', 'manageMembers', 'organization', false],
+            ['outsider', 'manageMembers', 'organization', false],
+            ['systemAdmin', 'delete', 'organization', true],
+            ['orgAdmin', 'delete', 'organization', false],
+            // `viewAny` is open by design — the listing query, not the gate,
+            // decides which organizations a caller actually sees.
+            ['student', 'viewAny', 'organization', true],
+            ['outsider', 'viewAny', 'organization', true],
+            ['systemAdmin', 'viewAll', 'organization', true],
+            ['orgAdmin', 'viewAll', 'organization', false],
 
             // ── Course ─────────────────────────────────────────────────────
             ['orgAdmin', 'create', 'course', true],
@@ -69,10 +86,21 @@ class AuthorizationMatrixTest extends TestCase
             ['instructorL01', 'view', 'course', true],
             ['student', 'view', 'course', true],
             ['outsider', 'view', 'course', false],
+            ['orgAdmin', 'delete', 'course', true],
+            ['instructorL01', 'delete', 'course', false],
+            ['orgAdmin', 'viewAny', 'course', true],
+            ['instructorL01', 'viewAny', 'course', true],
+            ['student', 'viewAny', 'course', true],
+            ['outsider', 'viewAny', 'course', false],
 
             // ── Semester (policy fields are Org Admin territory, D-16) ─────
             ['orgAdmin', 'update', 'semester', true],
             ['instructorL01', 'update', 'semester', false],
+            ['orgAdmin', 'delete', 'semester', true],
+            ['instructorL01', 'delete', 'semester', false],
+            ['orgAdmin', 'viewAny', 'semester', true],
+            ['student', 'viewAny', 'semester', true],
+            ['outsider', 'viewAny', 'semester', false],
 
             // ── Section ────────────────────────────────────────────────────
             ['orgAdmin', 'update', 'section', true],
@@ -82,6 +110,19 @@ class AuthorizationMatrixTest extends TestCase
             ['ta', 'view', 'section', true],
             ['student', 'view', 'section', true],
             ['otherStudent', 'view', 'section', false],
+            ['orgAdmin', 'delete', 'section', true],
+            ['instructorL01', 'delete', 'section', false],
+            ['instructorL01', 'manageMembers', 'section', true],
+            ['orgAdmin', 'manageMembers', 'section', true],
+            ['instructorL02', 'manageMembers', 'section', false],
+            ['ta', 'manageMembers', 'section', false],
+            ['student', 'manageMembers', 'section', false],
+            // Listing the sections of a semester is gated at course level;
+            // D-04 filtering of the rows happens in the query.
+            ['orgAdmin', 'viewAny', 'section', true],
+            ['instructorL01', 'viewAny', 'section', true],
+            ['student', 'viewAny', 'section', true],
+            ['outsider', 'viewAny', 'section', false],
 
             // ── Problem ────────────────────────────────────────────────────
             ['instructorL01', 'create', 'section', true],
@@ -166,9 +207,11 @@ class AuthorizationMatrixTest extends TestCase
     }
 
     /**
-     * `create` abilities take the parent as context, so the matrix can say
-     * "instructor of L01 may create a problem in L01" without inventing an
-     * unsaved model.
+     * `create` and `viewAny` abilities take the parent as context, so the
+     * matrix can say "instructor of L01 may create a problem in L01" without
+     * inventing an unsaved model. The target names what is being acted on,
+     * not what is passed: `create section` creates a problem *in* a section,
+     * while `viewAny section` lists the sections *of* the semester.
      *
      * @return mixed
      */
@@ -176,7 +219,12 @@ class AuthorizationMatrixTest extends TestCase
     {
         return match ([$ability, $target]) {
             ['create', 'organization'] => Organization::class,
+            ['viewAny', 'organization'] => Organization::class,
+            ['viewAll', 'organization'] => Organization::class,
             ['create', 'course'] => [Course::class, $this->world['organization']],
+            ['viewAny', 'course'] => [Course::class, $this->world['organization']],
+            ['viewAny', 'semester'] => [Semester::class, $this->world['course']],
+            ['viewAny', 'section'] => [Section::class, $this->world['semester']],
             ['create', 'section'] => [Problem::class, $this->world['sectionL01']],
             ['create', 'problem'] => [Submission::class, $this->world['problem']],
             ['create', 'problem.analysis'] => [AnalysisProblem::class, $this->world['problem']],

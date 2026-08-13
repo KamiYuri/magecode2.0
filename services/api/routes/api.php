@@ -2,10 +2,16 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Admin;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Auth\EmailVerificationController;
 use App\Http\Controllers\Auth\PasswordResetController;
+use App\Http\Controllers\CourseController;
 use App\Http\Controllers\HealthController;
+use App\Http\Controllers\OrganizationController;
+use App\Http\Controllers\OrganizationMemberController;
+use App\Http\Controllers\SectionController;
+use App\Http\Controllers\SemesterController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -35,6 +41,50 @@ Route::prefix('v1')->group(function (): void {
             Route::post('logout', [AuthController::class, 'logout'])->name('auth.logout');
             Route::post('first-time-setup', [AuthController::class, 'firstTimeSetup'])->name('auth.first-time-setup');
         });
+    });
+
+    Route::middleware('auth:sanctum')->group(function (): void {
+        // Route parameters are named for implicit binding ({organization}),
+        // while openapi.yml spells them {organization_id} — B11's conformance
+        // test compares paths with the placeholder names normalised away.
+        Route::get('admin/organizations', Admin\OrganizationController::class)->name('admin.organizations.index');
+
+        Route::get('organizations', [OrganizationController::class, 'index'])->name('organizations.index');
+        Route::post('organizations', [OrganizationController::class, 'store'])->name('organizations.store');
+        Route::get('organizations/{organization}', [OrganizationController::class, 'show'])->name('organizations.show');
+        Route::put('organizations/{organization}', [OrganizationController::class, 'update'])->name('organizations.update');
+
+        // Scoped bindings resolve {member} through the organization, so a
+        // membership id from elsewhere is a 404 rather than a cross-org leak.
+        Route::scopeBindings()->group(function (): void {
+            Route::get('organizations/{organization}/members', [OrganizationMemberController::class, 'index'])
+                ->name('organizations.members.index');
+            Route::post('organizations/{organization}/members', [OrganizationMemberController::class, 'store'])
+                ->name('organizations.members.store');
+            Route::put('organizations/{organization}/members/{member}', [OrganizationMemberController::class, 'update'])
+                ->name('organizations.members.update');
+            Route::delete('organizations/{organization}/members/{member}', [OrganizationMemberController::class, 'destroy'])
+                ->name('organizations.members.destroy');
+        });
+
+        Route::get('organizations/{organization}/courses', [CourseController::class, 'index'])
+            ->name('organizations.courses.index');
+        Route::post('organizations/{organization}/courses', [CourseController::class, 'store'])
+            ->name('organizations.courses.store');
+        Route::get('courses/{course}', [CourseController::class, 'show'])->name('courses.show');
+        Route::put('courses/{course}', [CourseController::class, 'update'])->name('courses.update');
+
+        Route::get('courses/{course}/semesters', [SemesterController::class, 'index'])->name('courses.semesters.index');
+        Route::post('courses/{course}/semesters', [SemesterController::class, 'store'])->name('courses.semesters.store');
+        Route::get('semesters/{semester}', [SemesterController::class, 'show'])->name('semesters.show');
+        Route::put('semesters/{semester}', [SemesterController::class, 'update'])->name('semesters.update');
+
+        Route::get('semesters/{semester}/sections', [SectionController::class, 'index'])
+            ->name('semesters.sections.index');
+        Route::post('semesters/{semester}/sections', [SectionController::class, 'store'])
+            ->name('semesters.sections.store');
+        Route::get('sections/{section}', [SectionController::class, 'show'])->name('sections.show');
+        Route::put('sections/{section}', [SectionController::class, 'update'])->name('sections.update');
     });
 });
 

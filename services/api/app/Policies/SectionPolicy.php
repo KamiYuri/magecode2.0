@@ -20,6 +20,15 @@ class SectionPolicy
             || $this->memberships->administersSection($user, $section);
     }
 
+    /**
+     * The gate only asks whether the semester is readable at all; D-04 is
+     * enforced on the rows, where a section instructor sees L01 and not L02.
+     */
+    public function viewAny(User $user, Semester $semester): bool
+    {
+        return app(SemesterPolicy::class)->view($user, $semester);
+    }
+
     public function create(User $user, Semester $semester): bool
     {
         return $this->memberships->isOrganizationAdmin($user, $semester->course->organization_id);

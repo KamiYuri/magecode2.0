@@ -18,6 +18,12 @@ class SemesterPolicy
         return app(CoursePolicy::class)->view($user, $semester->course);
     }
 
+    /** Whoever may read the course may list its semesters. */
+    public function viewAny(User $user, Course $course): bool
+    {
+        return app(CoursePolicy::class)->view($user, $course);
+    }
+
     public function create(User $user, Course $course): bool
     {
         return $this->memberships->isOrganizationAdmin($user, $course->organization_id);

@@ -6,15 +6,24 @@ Single writer to PostgreSQL in the batch path (D-80) and the only service expose
 through Traefik (D-86).
 
 ## Status
-B1 scaffold: bootable app with `/api/v1/health`. Migrations (B2), models (B3),
-auth (B4), and RBAC (B5) land next.
+Through B6: migrations + models + seeders, auth, the RBAC policy layer, and CRUD for
+organizations, courses, semesters, sections and organization members. Next: B7 roster
+import/transfer, B8 problems, B11 route conformance.
 
 ## Tech Stack
 PHP 8.4 (Docker) / 8.3+ (host constraint `^8.3`), Laravel 13, Sanctum bearer tokens,
 `bschmitt/laravel-amqp` for RabbitMQ, Reverb for WebSockets, Pint + Larastan (level 6).
 
 ## Key Files
-- `routes/api.php` — every endpoint under `/api/v1` (U-3); `/api/health` alias for probes
+- `routes/api.php` — every endpoint under `/api/v1` (U-3); `/api/health` alias for probes.
+  Parameters are named for implicit binding (`{organization}`) while openapi.yml spells
+  them `{organization_id}` — B11's conformance test normalises the placeholders
+- `app/Http/Responses/CursorPage.php` — the `{data, meta}` envelope; use it for every
+  paginated listing rather than Laravel's paginated resource response, whose meta differs
+- `app/Exceptions/ConflictException.php` — 409 + the contract's `code`; renders itself and
+  is safe to throw inside a transaction
+- `app/Services/` — `MembershipService` (who is what, where), `OrganizationMemberService`
+  (bulk add + last-admin guard), `UserProvisioningService` (email → first-time account)
 - `app/Http/Controllers/HealthController.php` — readiness probe (503 when DB is down)
 - `config/database.php` — pgsql `ATTR_EMULATE_PREPARES` for PgBouncer transaction pooling (D-89)
 - `Dockerfile` — targets `api` (nginx+FPM), `reverb`, `test`; deps resolved inside the

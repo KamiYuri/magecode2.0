@@ -29,7 +29,7 @@
 | B3 models + seeders | P0 | done | `512e2c3` | 11 backed enums added from schema §10; factories encode CHECK invariants; models carry `@property` for phpstan |
 | B4 auth | P0 | done | `5005c64` | email verify is unauthenticated (signed link + hash check); reset revokes all tokens, logout only the current one |
 | B5 rbac + policies | P0 | done | `96c6f13` | 66-case matrix green; System Admin = `users.is_system_admin` (artisan only), TA excluded from analysis. Matrix is ability-level — B6+ must attach policies to controllers, G3 re-runs it over HTTP |
-| B6 org/course/semester/section crud | P0 | todo | — | — |
+| B6 org/course/semester/section crud | P0 | done | `59cada5` | 21 endpoints; `{data, meta}` envelope via `CursorPage`, 409 + code via `ConflictException` — reuse both in B7–B12. Avatar endpoints deferred to C1 (no MinIO in api yet) |
 | B7 roster import + transfer | P1 | todo | — | — |
 | B8 problems + test cases lifecycle | P0 | todo | — | — |
 | B9 tags | P2 | todo | — | — |
@@ -122,6 +122,7 @@
 
 | Date | Task(s) | Outcome |
 |---|---|---|
+| 2026-08-13 | B6 | done — 21 endpoints (org/course/semester/section + org members), 268 tests green (953 assertions), pint + phpstan(6) clean. First `{data, meta}` producer: `CursorPage` builds the contract's `CursorMeta` (Laravel's paginated resource response emits `links`/`path` and no `has_more`); `ConflictException` renders the 409 + `code`. **For B7–B12**: reuse both, plus `UserProvisioningService` (roster import needs the same invite-an-unknown-email path) and `tests/Support/CreatesAcademicFixtures`. **For B11**: routes use implicit-binding parameter names (`{organization}`), so the conformance test must normalise placeholders before diffing against openapi's `{organization_id}`; `throttle:api` is still attached to nothing. Deliberately out of scope: org avatar upload/delete (needs C1's MinIO disk), section members (B7), `/me/sections`. Three decisions taken with the human and recorded as amendments: 409-with-code over 422 for duplicates, `end_date >= start_date`, and System Admin widened to manage organizations with the creator auto-enrolled as Org Admin. |
 | 2026-08-10 | — | Docs phase complete: design SoT, roadmap, UI/UX spec, session workflow. Code not started. |
 | 2026-08-10 | A1 | done — `shared/go/logger` implemented TDD, 7 tests green, merged to `shared/dev`. Note: `go.work` lists nonexistent `services/*` modules + stale go directive; run shared/go tooling with `GOWORK=off` until A7 fixes it. |
 | 2026-08-10 | A2 | done — `shared/go/config` fail-fast env loader, 8 tests green, merged to `shared/dev`. |
