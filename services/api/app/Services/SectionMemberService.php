@@ -88,6 +88,10 @@ class SectionMemberService
      */
     public function transfer(SectionMember $member, Section $target, User $actor): SectionMember
     {
+        if ($member->role !== SectionRole::Student) {
+            throw UnprocessableException::transferNotAStudent();
+        }
+
         if ($target->semester_id !== $member->section->semester_id) {
             throw UnprocessableException::transferOutsideSemester();
         }

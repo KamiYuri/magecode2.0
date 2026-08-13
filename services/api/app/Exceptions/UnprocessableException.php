@@ -30,6 +30,15 @@ final class UnprocessableException extends ApiException
         );
     }
 
+    /** Only a student enrolment is transferable; staff hold their own rows. */
+    public static function transferNotAStudent(): self
+    {
+        return new self(
+            'TRANSFER_NOT_A_STUDENT',
+            'Only a student enrolment can be transferred between sections.'
+        );
+    }
+
     /** The target section belongs to a different semester (D-50). */
     public static function transferOutsideSemester(): self
     {

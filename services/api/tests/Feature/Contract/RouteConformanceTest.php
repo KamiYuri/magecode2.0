@@ -48,10 +48,6 @@ class RouteConformanceTest extends TestCase
      * @var array<string, array<int, string>>
      */
     private const PENDING = [
-        'B7 section roster' => [
-            'POST /sections/{}/members/import',
-            'POST /sections/{}/members/{}/transfer',
-        ],
         'B9 tags' => [
             'GET /courses/{}/tags',
             'POST /courses/{}/tags',

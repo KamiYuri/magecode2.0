@@ -13,6 +13,8 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Notification;
 use Laravel\Sanctum\Sanctum;
+use OpenSpout\Common\Entity\Row;
+use OpenSpout\Writer\XLSX\Writer;
 use Tests\Support\CreatesAcademicFixtures;
 use Tests\TestCase;
 
@@ -151,6 +153,27 @@ class RosterImportTest extends TestCase
         ]);
     }
 
+    public function test_a_spreadsheet_imports_exactly_like_a_csv(): void
+    {
+        // The registrar exports whichever format their system produces, so
+        // both have to behave the same.
+        Notification::fake();
+        Sanctum::actingAs($this->instructor);
+
+        $this->postJson("/api/v1/sections/{$this->section->id}/members/import", [
+            'file' => $this->spreadsheet([
+                ['email', 'student_id', 'first_name', 'last_name'],
+                ['an.nguyen@sis.hust.edu.vn', '20210001', 'An', 'Nguyễn'],
+                ['not-an-email', '20210004', 'Bad', 'Row'],
+            ]),
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.imported', 1)
+            ->assertJsonPath('data.errors.0.row', 3);
+
+        $this->assertDatabaseHas('users', ['email' => 'an.nguyen@sis.hust.edu.vn', 'student_id' => '20210001']);
+    }
+
     public function test_a_file_without_an_email_column_is_rejected_outright(): void
     {
         Sanctum::actingAs($this->instructor);
@@ -192,5 +215,26 @@ class RosterImportTest extends TestCase
         $path = __DIR__.'/../../Fixtures/roster/'.$name;
 
         return new UploadedFile($path, $name, 'text/csv', null, true);
+    }
+
+    /**
+     * Written rather than committed as a binary fixture: a generated .xlsx
+     * stays readable in the diff and cannot drift from what the test claims.
+     *
+     * @param  array<int, array<int, string>>  $rows
+     */
+    private function spreadsheet(array $rows): UploadedFile
+    {
+        $path = tempnam(sys_get_temp_dir(), 'roster').'.xlsx';
+        $writer = new Writer;
+        $writer->openToFile($path);
+
+        foreach ($rows as $cells) {
+            $writer->addRow(Row::fromValues($cells));
+        }
+
+        $writer->close();
+
+        return new UploadedFile($path, 'roster.xlsx', null, null, true);
     }
 }

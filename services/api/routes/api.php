@@ -97,6 +97,11 @@ Route::prefix('v1')->group(function (): void {
                 ->name('sections.members.index');
             Route::post('sections/{section}/members', [SectionMemberController::class, 'store'])
                 ->name('sections.members.store');
+            Route::post('sections/{section}/members/import', [SectionMemberController::class, 'import'])
+                ->middleware('throttle:uploads')
+                ->name('sections.members.import');
+            Route::post('sections/{section}/members/{member}/transfer', [SectionMemberController::class, 'transfer'])
+                ->name('sections.members.transfer');
             Route::put('sections/{section}/members/{member}', [SectionMemberController::class, 'update'])
                 ->name('sections.members.update');
             Route::delete('sections/{section}/members/{member}', [SectionMemberController::class, 'destroy'])

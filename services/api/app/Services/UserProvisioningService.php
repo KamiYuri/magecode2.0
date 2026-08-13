@@ -21,9 +21,10 @@ class UserProvisioningService
     private const MAX_USERNAME_PROBES = 50;
 
     /**
+     * @param  array{first_name?: string|null, last_name?: string|null, student_id?: string|null}  $known
      * @return array{user: User, invited: bool, password: string|null}
      */
-    public function findOrInvite(string $email): array
+    public function findOrInvite(string $email, array $known = []): array
     {
         $existing = User::where('email', $email)->first();
 
@@ -39,7 +40,7 @@ class UserProvisioningService
             // rolls back only the failed insert. Without it the enclosing
             // batch transaction would be poisoned by Postgres.
             $user = DB::transaction(
-                fn (): User => $this->createInvitee($email, $this->availableUsername($localPart), $password, $localPart)
+                fn (): User => $this->createInvitee($email, $this->availableUsername($localPart), $password, $localPart, $known)
             );
         } catch (UniqueConstraintViolationException $collision) {
             $raced = User::where('email', $email)->first();
@@ -50,22 +51,35 @@ class UserProvisioningService
 
             // Someone took the username between the probe and the insert.
             $unique = Str::limit($this->slug($localPart), 42, '').'-'.Str::lower(Str::random(6));
-            $user = DB::transaction(fn (): User => $this->createInvitee($email, $unique, $password, $localPart));
+            $user = DB::transaction(fn (): User => $this->createInvitee($email, $unique, $password, $localPart, $known));
         }
 
         return ['user' => $user, 'invited' => true, 'password' => $password];
     }
 
-    private function createInvitee(string $email, string $username, string $password, string $localPart): User
-    {
+    /**
+     * @param  array{first_name?: string|null, last_name?: string|null, student_id?: string|null}  $known
+     */
+    private function createInvitee(
+        string $email,
+        string $username,
+        string $password,
+        string $localPart,
+        array $known = [],
+    ): User {
+        // A roster usually names the person; an invitation by email alone does
+        // not, so the local part stands in until first-time setup corrects it.
+        $firstName = $known['first_name'] ?? null;
+
         return User::create([
             'username' => $username,
             'email' => $email,
             'password' => $password,
-            // A placeholder name the invitee overwrites during first-time
-            // setup; both columns are NOT NULL and nothing else is known yet.
-            'first_name' => Str::limit(Str::title(str_replace(['.', '_', '-'], ' ', $localPart)), 100, ''),
-            'last_name' => '',
+            'first_name' => $firstName !== null && $firstName !== ''
+                ? Str::limit($firstName, 100, '')
+                : Str::limit(Str::title(str_replace(['.', '_', '-'], ' ', $localPart)), 100, ''),
+            'last_name' => Str::limit($known['last_name'] ?? '', 100, ''),
+            'student_id' => ($known['student_id'] ?? '') !== '' ? $known['student_id'] : null,
             'is_first_time_register' => true,
         ]);
     }
