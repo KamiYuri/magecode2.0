@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use Database\Factories\OrganizationFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -17,6 +18,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string|null $email
  * @property string|null $avatar_path
  * @property int $creator_id
+ * @property-read string|null $my_role  Only present after scopeWithMyRole()
  */
 class Organization extends Model
 {
@@ -41,5 +43,22 @@ class Organization extends Model
     public function members(): HasMany
     {
         return $this->hasMany(OrganizationMember::class);
+    }
+
+    /**
+     * Selects the caller's own role alongside each row. A per-row membership
+     * lookup would be one query per organization in a listing, which is what
+     * MembershipService's per-subject memoisation cannot help with.
+     *
+     * @param  Builder<Organization>  $query
+     */
+    public function scopeWithMyRole(Builder $query, User $user): void
+    {
+        $query->addSelect(['my_role' => OrganizationMember::query()
+            ->select('role')
+            ->whereColumn('organization_id', 'organizations.id')
+            ->where('user_id', $user->id)
+            ->limit(1),
+        ]);
     }
 }
