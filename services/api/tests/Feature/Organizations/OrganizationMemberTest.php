@@ -40,7 +40,9 @@ class OrganizationMemberTest extends TestCase
 
         $this->assertCount(2, $response->json('data'));
 
-        $rows = collect($response->json('data'))->keyBy('user.id');
+        /** @var array<int, array<string, mixed>> $data */
+        $data = $response->json('data');
+        $rows = collect($data)->keyBy('user.id');
         $this->assertSame($organization->creator_id, $rows[$invited->id]['added_by']['id']);
         // The founding admin has no adder: the DB column is nullable even
         // though the contract types added_by as a plain UserSummary.

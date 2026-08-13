@@ -8,6 +8,7 @@ use App\Http\Controllers\Auth\EmailVerificationController;
 use App\Http\Controllers\Auth\PasswordResetController;
 use App\Http\Controllers\HealthController;
 use App\Http\Controllers\OrganizationController;
+use App\Http\Controllers\OrganizationMemberController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -49,6 +50,19 @@ Route::prefix('v1')->group(function (): void {
         Route::post('organizations', [OrganizationController::class, 'store'])->name('organizations.store');
         Route::get('organizations/{organization}', [OrganizationController::class, 'show'])->name('organizations.show');
         Route::put('organizations/{organization}', [OrganizationController::class, 'update'])->name('organizations.update');
+
+        // Scoped bindings resolve {member} through the organization, so a
+        // membership id from elsewhere is a 404 rather than a cross-org leak.
+        Route::scopeBindings()->group(function (): void {
+            Route::get('organizations/{organization}/members', [OrganizationMemberController::class, 'index'])
+                ->name('organizations.members.index');
+            Route::post('organizations/{organization}/members', [OrganizationMemberController::class, 'store'])
+                ->name('organizations.members.store');
+            Route::put('organizations/{organization}/members/{member}', [OrganizationMemberController::class, 'update'])
+                ->name('organizations.members.update');
+            Route::delete('organizations/{organization}/members/{member}', [OrganizationMemberController::class, 'destroy'])
+                ->name('organizations.members.destroy');
+        });
     });
 });
 
