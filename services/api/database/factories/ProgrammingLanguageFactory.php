@@ -22,6 +22,7 @@ class ProgrammingLanguageFactory extends Factory
             'monaco_language' => 'python',
             'dolos_language' => 'python',
             'codeql_language' => 'python',
+            'file_extensions' => ['py'],
         ];
     }
 }
