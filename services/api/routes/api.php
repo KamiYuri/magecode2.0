@@ -13,6 +13,7 @@ use App\Http\Controllers\OrganizationMemberController;
 use App\Http\Controllers\ProblemController;
 use App\Http\Controllers\SectionController;
 use App\Http\Controllers\SemesterController;
+use App\Http\Controllers\TestCaseController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -99,6 +100,11 @@ Route::prefix('v1')->group(function (): void {
         Route::patch('problems/{problem}/lock', [ProblemController::class, 'lock'])->name('problems.lock');
         Route::put('problems/{problem}', [ProblemController::class, 'update'])->name('problems.update');
         Route::delete('problems/{problem}', [ProblemController::class, 'destroy'])->name('problems.destroy');
+
+        Route::get('problems/{problem}/test-cases', [TestCaseController::class, 'index'])
+            ->name('problems.test-cases.index');
+        Route::put('problems/{problem}/test-cases', [TestCaseController::class, 'update'])
+            ->name('problems.test-cases.update');
     });
 });
 
