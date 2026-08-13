@@ -32,6 +32,11 @@
         <env name="DB_PORT" value="5432"/>
         <env name="DB_DATABASE" value="magecode_test"/>
         <env name="DB_URL" value=""/>
+        <!-- Storage assertions must not depend on a developer's .env. The MinIO
+             integration tests read MINIO_TEST_* instead, because PHPUnit's <env>
+             never overrides a real process variable. -->
+        <env name="FILESYSTEM_DISK" value="minio"/>
+        <env name="MINIO_PRESIGNED_URL_TTL" value="21600"/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>
