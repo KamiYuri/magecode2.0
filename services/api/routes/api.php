@@ -45,7 +45,10 @@ Route::prefix('v1')->group(function (): void {
         });
     });
 
-    Route::middleware('auth:sanctum')->group(function (): void {
+    // Every authenticated endpoint carries the global limit from openapi.yml's
+    // rate-limit table; the tighter per-operation limiters (submissions,
+    // analysis, uploads) are attached by the tasks that add those routes.
+    Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
         // Route parameters are named for implicit binding ({organization}),
         // while openapi.yml spells them {organization_id} — B11's conformance
         // test compares paths with the placeholder names normalised away.

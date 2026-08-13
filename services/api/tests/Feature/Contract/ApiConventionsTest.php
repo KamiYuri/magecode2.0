@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Contract;
 
-use App\Models\Organization;
 use App\Models\User;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Foundation\Testing\RefreshDatabase;
