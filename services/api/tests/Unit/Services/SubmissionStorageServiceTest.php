@@ -9,6 +9,7 @@ use App\Services\StoredSubmissionFile;
 use App\Services\SubmissionFileException;
 use App\Services\SubmissionStorageService;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -239,7 +240,7 @@ class SubmissionStorageServiceTest extends TestCase
      * The faked disk is a local one, whose temporaryUrl() throws. Intercepting
      * the callback is the only way to see the expiry the service asked for.
      *
-     * @return callable(): \Illuminate\Support\Carbon
+     * @return callable(): Carbon
      */
     private function captureExpiration(): callable
     {
@@ -247,7 +248,7 @@ class SubmissionStorageServiceTest extends TestCase
 
         Storage::disk('minio')->buildTemporaryUrlsUsing(
             function (string $path, \DateTimeInterface $at) use (&$expiration): string {
-                $expiration = \Illuminate\Support\Carbon::instance($at);
+                $expiration = Carbon::instance($at);
 
                 return "https://minio.test/{$path}";
             }
