@@ -6,9 +6,9 @@ Single writer to PostgreSQL in the batch path (D-80) and the only service expose
 through Traefik (D-86).
 
 ## Status
-Through B6: migrations + models + seeders, auth, the RBAC policy layer, and CRUD for
-organizations, courses, semesters, sections and organization members. Next: B7 roster
-import/transfer, B8 problems, B11 route conformance.
+Through B8: migrations + models + seeders, auth, the RBAC policy layer, CRUD for
+organizations/courses/semesters/sections + org members, and the problem & test-case
+lifecycle. Next: B7 roster import/transfer, B10 problem bank, B11 route conformance.
 
 ## Tech Stack
 PHP 8.4 (Docker) / 8.3+ (host constraint `^8.3`), Laravel 13, Sanctum bearer tokens,
@@ -23,7 +23,10 @@ PHP 8.4 (Docker) / 8.3+ (host constraint `^8.3`), Laravel 13, Sanctum bearer tok
 - `app/Exceptions/ConflictException.php` — 409 + the contract's `code`; renders itself and
   is safe to throw inside a transaction
 - `app/Services/` — `MembershipService` (who is what, where), `OrganizationMemberService`
-  (bulk add + last-admin guard), `UserProvisioningService` (email → first-time account)
+  (bulk add + last-admin guard), `UserProvisioningService` (email → first-time account),
+  `ProblemVisibilityService` (D-16 effective publish/lock), `ProblemService`, `TestCaseService`
+- `app/Models/Problem.php::visibleIn()` — the SQL mirror of `ProblemVisibilityService::isVisible()`;
+  change one and change the other, or a listing disagrees with the `is_visible` it reports
 - `app/Http/Controllers/HealthController.php` — readiness probe (503 when DB is down)
 - `config/database.php` — pgsql `ATTR_EMULATE_PREPARES` for PgBouncer transaction pooling (D-89)
 - `Dockerfile` — targets `api` (nginx+FPM), `reverb`, `test`; deps resolved inside the

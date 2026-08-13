@@ -139,6 +139,21 @@ class AuthorizationMatrixTest extends TestCase
             ['instructorL01', 'viewTestCases', 'problem', true],
             ['ta', 'viewTestCases', 'problem', true],
             ['student', 'viewTestCases', 'problem', false],
+            // A TA reads the test cases but never edits them, so a hidden
+            // expected output cannot be changed by someone who only assists.
+            ['instructorL01', 'updateTestCases', 'problem', true],
+            ['orgAdmin', 'updateTestCases', 'problem', true],
+            ['ta', 'updateTestCases', 'problem', false],
+            ['student', 'updateTestCases', 'problem', false],
+            ['instructorL01', 'delete', 'problem', true],
+            ['ta', 'delete', 'problem', false],
+            // Listing is open to the whole section; publish state filters rows.
+            ['instructorL01', 'viewAny', 'problem', true],
+            ['ta', 'viewAny', 'problem', true],
+            ['student', 'viewAny', 'problem', true],
+            ['orgAdmin', 'viewAny', 'problem', true],
+            ['instructorL02', 'viewAny', 'problem', false],
+            ['outsider', 'viewAny', 'problem', false],
 
             // ── Submission ─────────────────────────────────────────────────
             ['student', 'view', 'ownSubmission', true],
@@ -226,6 +241,7 @@ class AuthorizationMatrixTest extends TestCase
             ['viewAny', 'semester'] => [Semester::class, $this->world['course']],
             ['viewAny', 'section'] => [Section::class, $this->world['semester']],
             ['create', 'section'] => [Problem::class, $this->world['sectionL01']],
+            ['viewAny', 'problem'] => [Problem::class, $this->world['sectionL01']],
             ['create', 'problem'] => [Submission::class, $this->world['problem']],
             ['create', 'problem.analysis'] => [AnalysisProblem::class, $this->world['problem']],
             ['create', 'tag'] => [Tag::class, $this->world['course']],
