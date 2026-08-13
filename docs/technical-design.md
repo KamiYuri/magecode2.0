@@ -422,6 +422,7 @@ All tables are designed from zero for the new domain model. PostgreSQL 16 with P
 | `monaco_language` | VARCHAR(30) | NOT NULL | Monaco editor language key |
 | `dolos_language` | VARCHAR(30) | NULLABLE | Dolos parser language key |
 | `codeql_language` | VARCHAR(30) | NULLABLE | CodeQL language key |
+| `file_extensions` | JSONB | NOT NULL | Accepted source extensions, no leading dot (U-4). First entry names the file when a submission arrives without one |
 
 ### 7.3. Problem Bank Tables
 

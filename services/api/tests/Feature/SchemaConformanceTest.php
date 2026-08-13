@@ -251,6 +251,16 @@ class SchemaConformanceTest extends TestCase
         $this->assertSame('jsonb', $type->data_type);
     }
 
+    public function test_programming_languages_file_extensions_column_is_jsonb(): void
+    {
+        $type = DB::selectOne(
+            "SELECT data_type FROM information_schema.columns
+             WHERE table_name = 'programming_languages' AND column_name = 'file_extensions'"
+        );
+
+        $this->assertSame('jsonb', $type->data_type);
+    }
+
     public function test_users_table_matches_the_documented_columns(): void
     {
         $expected = [

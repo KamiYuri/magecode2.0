@@ -775,7 +775,7 @@ components:
       description: "Submit via Monaco editor (JSON body)"
       properties:
         programming_language_id: { type: integer, format: int64 }
-        source_code: { type: string, maxLength: 1048576, description: "Max 1MB (D-33)" }
+        source_code: { type: string, maxLength: 51200, description: "Max 50KB (D-34)" }
     SubmitFileRequest:
       type: object
       required: [programming_language_id, file]
@@ -785,7 +785,7 @@ components:
         file:
           type: string
           format: binary
-          description: "Source code file, max 1MB (D-33)"
+          description: "Source code file, max 50KB (D-34). Extension must be one of the language's file_extensions"
     CodeExecutionResult:
       type: object
       description: |
@@ -998,6 +998,11 @@ components:
         name: { type: string }
         version: { type: string, nullable: true }
         monaco_language: { type: string, description: "Monaco editor language key for syntax highlighting" }
+        file_extensions:
+          type: array
+          items: { type: string }
+          description: "Accepted source file extensions, no leading dot (e.g. [\"cpp\", \"cc\", \"cxx\"])"
+
 
     # ── Notification ── [FIX: Schema 5 — typed discriminator]
     Notification:

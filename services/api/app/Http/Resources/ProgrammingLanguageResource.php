@@ -24,6 +24,7 @@ class ProgrammingLanguageResource extends JsonResource
             'name' => $this->name,
             'version' => $this->version,
             'monaco_language' => $this->monaco_language,
+            'file_extensions' => $this->file_extensions,
         ];
     }
 }

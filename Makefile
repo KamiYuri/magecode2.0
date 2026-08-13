@@ -40,9 +40,20 @@ dev-reverb:
 # ── API quality gates (run in Docker: host PHP lacks pdo_pgsql/amqp) ──
 # The contract is mounted one level above the app root so the suite's route
 # conformance test finds it by walking up, exactly as it does on the host.
+#
+# The MinIO-backed tests skip unless MINIO_TEST_* reaches the container. Gate on
+# MINIO_ROOT_PASSWORD (the one .env marks REQUIRED) and default the rest, so a
+# half-exported environment skips cleanly instead of failing with a 403:
+#   set -a && . ./.env && set +a && make test-api
+MINIO_TEST_ENV = $(if $(MINIO_ROOT_PASSWORD),\
+	-e MINIO_TEST_ENDPOINT=http://minio:9000 \
+	-e MINIO_TEST_ACCESS_KEY=$(or $(MINIO_ROOT_USER),magecode) \
+	-e MINIO_TEST_SECRET_KEY=$(MINIO_ROOT_PASSWORD) \
+	-e MINIO_TEST_BUCKET=$(or $(MINIO_BUCKET),magecode),)
+
 API_RUN = docker run --rm --network magecode-backend -v $(PWD)/services/api:/var/www/html \
 	-v $(PWD)/docs/api-contracts:/var/www/docs/api-contracts:ro \
-	-e DB_HOST=postgres -e DB_PORT=5432 magecode-api:test
+	-e DB_HOST=postgres -e DB_PORT=5432 $(MINIO_TEST_ENV) magecode-api:test
 
 api-image:
 	docker build --target test -t magecode-api:test services/api

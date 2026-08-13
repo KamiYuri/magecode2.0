@@ -15,10 +15,10 @@ use Illuminate\Database\Seeder;
 class ProgrammingLanguageSeeder extends Seeder
 {
     private const LANGUAGES = [
-        ['name' => 'Python', 'version' => '3.11', 'judge0_id' => 71, 'monaco_language' => 'python', 'dolos_language' => 'python', 'codeql_language' => 'python'],
-        ['name' => 'Java', 'version' => '17', 'judge0_id' => 62, 'monaco_language' => 'java', 'dolos_language' => 'java', 'codeql_language' => 'java'],
-        ['name' => 'C', 'version' => '11', 'judge0_id' => 50, 'monaco_language' => 'c', 'dolos_language' => 'c', 'codeql_language' => 'cpp'],
-        ['name' => 'C++', 'version' => '17', 'judge0_id' => 54, 'monaco_language' => 'cpp', 'dolos_language' => 'cpp', 'codeql_language' => 'cpp'],
+        ['name' => 'Python', 'version' => '3.11', 'judge0_id' => 71, 'monaco_language' => 'python', 'dolos_language' => 'python', 'codeql_language' => 'python', 'file_extensions' => ['py']],
+        ['name' => 'Java', 'version' => '17', 'judge0_id' => 62, 'monaco_language' => 'java', 'dolos_language' => 'java', 'codeql_language' => 'java', 'file_extensions' => ['java']],
+        ['name' => 'C', 'version' => '11', 'judge0_id' => 50, 'monaco_language' => 'c', 'dolos_language' => 'c', 'codeql_language' => 'cpp', 'file_extensions' => ['c']],
+        ['name' => 'C++', 'version' => '17', 'judge0_id' => 54, 'monaco_language' => 'cpp', 'dolos_language' => 'cpp', 'codeql_language' => 'cpp', 'file_extensions' => ['cpp', 'cc', 'cxx']],
     ];
 
     public function run(): void

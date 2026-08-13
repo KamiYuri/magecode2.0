@@ -62,6 +62,29 @@ return [
             'report' => false,
         ],
 
+        /*
+         * MinIO (D-31): submission source code and, later, avatars. Kept apart
+         * from the `s3` disk above so the AWS-flavoured env names stay free for
+         * a real S3 deployment.
+         */
+        'minio' => [
+            'driver' => 's3',
+            'key' => env('MINIO_ACCESS_KEY'),
+            'secret' => env('MINIO_SECRET_KEY'),
+            // MinIO ignores the region, but the AWS SDK refuses to build a
+            // client without one.
+            'region' => env('MINIO_REGION', 'us-east-1'),
+            'bucket' => env('MINIO_BUCKET', 'magecode'),
+            'endpoint' => env('MINIO_ENDPOINT', 'http://minio:9000'),
+            // Bucket in the path: the virtual-host form `magecode.minio:9000`
+            // does not resolve inside the compose network.
+            'use_path_style_endpoint' => true,
+            // A failed write must not leave the caller with a submission row
+            // pointing at an object that was never stored.
+            'throw' => true,
+            'report' => false,
+        ],
+
     ],
 
     /*

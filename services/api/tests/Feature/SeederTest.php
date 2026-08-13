@@ -34,6 +34,16 @@ class SeederTest extends TestCase
         foreach ($expected as $language) {
             $this->assertDatabaseHas('programming_languages', $language);
         }
+
+        // Asserted through the cast, not assertDatabaseHas: an array value does
+        // not bind against a jsonb column.
+        $extensions = [71 => ['py'], 62 => ['java'], 50 => ['c'], 54 => ['cpp', 'cc', 'cxx']];
+        foreach ($extensions as $judge0Id => $expectedExtensions) {
+            $this->assertSame(
+                $expectedExtensions,
+                ProgrammingLanguage::where('judge0_id', $judge0Id)->sole()->file_extensions
+            );
+        }
     }
 
     public function test_seeding_twice_is_idempotent(): void
