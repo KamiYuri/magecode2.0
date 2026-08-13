@@ -31,7 +31,7 @@
 | B5 rbac + policies | P0 | done | `96c6f13` | 66-case matrix green; System Admin = `users.is_system_admin` (artisan only), TA excluded from analysis. Matrix is ability-level — B6+ must attach policies to controllers, G3 re-runs it over HTTP |
 | B6 org/course/semester/section crud | P0 | done | `59cada5` | 21 endpoints; `{data, meta}` envelope via `CursorPage`, 409 + code via `ConflictException` — reuse both in B7–B12. Avatar endpoints deferred to C1 (no MinIO in api yet) |
 | B7 roster import + transfer | P1 | todo | — | — |
-| B8 problems + test cases lifecycle | P0 | todo | — | — |
+| B8 problems + test cases lifecycle | P0 | wip | `api/feat/problems` | — |
 | B9 tags | P2 | todo | — | — |
 | B10 problem bank | P1 | todo | — | — |
 | B11 route conformance /api/v1 | P0 | todo | — | — |
