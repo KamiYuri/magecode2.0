@@ -7,6 +7,7 @@ namespace App\Models;
 use App\Enums\Difficulty;
 use App\Enums\PublishMode;
 use Database\Factories\ProblemFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -64,6 +65,50 @@ class Problem extends Model
             'lock_time' => 'datetime',
             'testcases_updated_at' => 'datetime',
         ];
+    }
+
+    /**
+     * The SQL mirror of ProblemVisibilityService::isVisible(), for listings
+     * that cannot ask row by row. The two must agree — a student who sees a
+     * row here and `is_visible: false` on it would be reading a bug.
+     *
+     * @param  Builder<Problem>  $query
+     */
+    public function scopeVisibleIn(Builder $query, Semester $semester): void
+    {
+        if (! $semester->allow_publish_override) {
+            self::constrainOpen($query, $semester->publish_mode);
+
+            return;
+        }
+
+        $query->where(function (Builder $outer) use ($semester): void {
+            $outer
+                ->where(function (Builder $row) use ($semester): void {
+                    $row->whereNull('publish_mode_override');
+                    self::constrainOpen($row, $semester->publish_mode);
+                })
+                ->orWhere(function (Builder $row): void {
+                    $row->where('publish_mode_override', PublishMode::Auto->value);
+                    self::constrainOpen($row, PublishMode::Auto);
+                })
+                ->orWhere(function (Builder $row): void {
+                    $row->where('publish_mode_override', PublishMode::Manual->value);
+                    self::constrainOpen($row, PublishMode::Manual);
+                });
+        });
+    }
+
+    /** @param  Builder<Problem>  $query */
+    private static function constrainOpen(Builder $query, PublishMode $mode): void
+    {
+        if ($mode === PublishMode::Auto) {
+            $query->whereNotNull('activation_time')->where('activation_time', '<=', now());
+
+            return;
+        }
+
+        $query->where('is_published', true);
     }
 
     /** @return BelongsTo<Section, $this> */
