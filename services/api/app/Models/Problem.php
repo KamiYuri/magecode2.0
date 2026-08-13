@@ -6,7 +6,9 @@ namespace App\Models;
 
 use App\Enums\Difficulty;
 use App\Enums\PublishMode;
+use App\Observers\ProblemObserver;
 use Database\Factories\ProblemFactory;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -39,7 +41,11 @@ use Illuminate\Support\Carbon;
  * @property string|null $manual_match_group_id
  * @property Carbon|null $testcases_updated_at
  * @property Carbon|null $deleted_at
+ * @property-read int|null $submissions_count
+ * @property-read int|null $my_submissions_count
+ * @property-read string|null $my_best_status  Only present after scopeWithMyProgress()
  */
+#[ObservedBy(ProblemObserver::class)]
 class Problem extends Model
 {
     /** @use HasFactory<ProblemFactory> */
@@ -99,6 +105,29 @@ class Problem extends Model
         });
     }
 
+    /**
+     * The caller's own standing. "Best" is the submission that passed the most
+     * test cases, the most recent one breaking a tie — the ranking a student
+     * would apply themselves.
+     *
+     * @param  Builder<Problem>  $query
+     */
+    public function scopeWithMyProgress(Builder $query, User $user): void
+    {
+        $query
+            ->withCount(['submissions as my_submissions_count' => function (Builder $mine) use ($user): void {
+                $mine->where('creator_id', $user->id);
+            }])
+            ->addSelect(['my_best_status' => Submission::query()
+                ->select('execution_status')
+                ->whereColumn('problem_id', 'problems.id')
+                ->where('creator_id', $user->id)
+                ->orderByDesc('testcases_passed')
+                ->orderByDesc('id')
+                ->limit(1),
+            ]);
+    }
+
     /** @param  Builder<Problem>  $query */
     private static function constrainOpen(Builder $query, PublishMode $mode): void
     {
@@ -133,6 +162,17 @@ class Problem extends Model
     public function testCases(): HasMany
     {
         return $this->hasMany(TestCase::class);
+    }
+
+    /**
+     * The subset a student may read. A separate relation rather than a filter
+     * at the call site, so no reader can eager-load the full set by accident.
+     *
+     * @return HasMany<TestCase, $this>
+     */
+    public function sampleTestCases(): HasMany
+    {
+        return $this->hasMany(TestCase::class)->where('is_visible', true)->orderBy('order');
     }
 
     /** @return HasMany<Submission, $this> */

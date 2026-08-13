@@ -24,6 +24,16 @@ class ProblemPolicy
             || $this->memberships->administersSection($user, $problem->section);
     }
 
+    /**
+     * Listing is open to the whole section; which rows come back depends on
+     * publish state, which the query decides.
+     */
+    public function viewAny(User $user, Section $section): bool
+    {
+        return $this->memberships->isSectionMember($user, $section)
+            || $this->memberships->administersSection($user, $section);
+    }
+
     public function create(User $user, Section $section): bool
     {
         return $this->memberships->isSectionInstructor($user, $section)

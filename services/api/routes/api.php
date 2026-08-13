@@ -10,6 +10,7 @@ use App\Http\Controllers\CourseController;
 use App\Http\Controllers\HealthController;
 use App\Http\Controllers\OrganizationController;
 use App\Http\Controllers\OrganizationMemberController;
+use App\Http\Controllers\ProblemController;
 use App\Http\Controllers\SectionController;
 use App\Http\Controllers\SemesterController;
 use Illuminate\Support\Facades\Route;
@@ -85,6 +86,14 @@ Route::prefix('v1')->group(function (): void {
             ->name('semesters.sections.store');
         Route::get('sections/{section}', [SectionController::class, 'show'])->name('sections.show');
         Route::put('sections/{section}', [SectionController::class, 'update'])->name('sections.update');
+
+        Route::get('sections/{section}/problems', [ProblemController::class, 'index'])
+            ->name('sections.problems.index');
+        Route::post('sections/{section}/problems', [ProblemController::class, 'store'])
+            ->name('sections.problems.store');
+        Route::get('problems/{problem}', [ProblemController::class, 'show'])->name('problems.show');
+        Route::put('problems/{problem}', [ProblemController::class, 'update'])->name('problems.update');
+        Route::delete('problems/{problem}', [ProblemController::class, 'destroy'])->name('problems.destroy');
     });
 });
 
