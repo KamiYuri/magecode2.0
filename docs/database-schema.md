@@ -387,7 +387,7 @@ Schema::create('submissions', function (Blueprint $table) {
 | problem_id | `foreignId(...)` | FK → problems.id, RESTRICT | Which problem |
 | creator_id | `foreignId('creator_id')` | FK → users.id, RESTRICT | Who submitted (student) |
 | programming_language_id | `foreignId(...)` | FK → programming_languages.id, RESTRICT | Language used |
-| file_path | `string('file_path', 500)` | NOT NULL | MinIO path: submissions/{id}/main.py |
+| file_path | `string('file_path', 500)` | NOT NULL | MinIO key: `submissions/{problem_id}/{submission_id}/{filename}` (D-42/D-77) |
 | file_name | `string('file_name')` | NOT NULL | Original filename |
 | execution_status | `string(..., 30)` | DEFAULT 'in_queue' | Overall CES status |
 | testcases_passed | `integer(...)` | DEFAULT 0 | Count of passed test cases |
@@ -451,6 +451,7 @@ Schema::create('programming_languages', function (Blueprint $table) {
     $table->string('monaco_language', 30);
     $table->string('dolos_language', 30)->nullable();
     $table->string('codeql_language', 30)->nullable();
+    $table->jsonb('file_extensions');   // upload allowlist (U-4); first entry is canonical
     $table->timestamps();
 });
 ```
@@ -458,10 +459,10 @@ Schema::create('programming_languages', function (Blueprint $table) {
 **Seed data** (for AI agents — use in DatabaseSeeder):
 ```php
 // judge0_id values from Judge0 CE
-['name' => 'Python',  'version' => '3.11', 'judge0_id' => 71, 'monaco_language' => 'python',  'dolos_language' => 'python', 'codeql_language' => 'python'],
-['name' => 'Java',    'version' => '17',   'judge0_id' => 62, 'monaco_language' => 'java',    'dolos_language' => 'java',   'codeql_language' => 'java'],
-['name' => 'C',       'version' => '11',   'judge0_id' => 50, 'monaco_language' => 'c',       'dolos_language' => 'c',      'codeql_language' => 'cpp'],
-['name' => 'C++',     'version' => '17',   'judge0_id' => 54, 'monaco_language' => 'cpp',     'dolos_language' => 'cpp',    'codeql_language' => 'cpp'],
+['name' => 'Python',  'version' => '3.11', 'judge0_id' => 71, 'monaco_language' => 'python',  'dolos_language' => 'python', 'codeql_language' => 'python', 'file_extensions' => ['py']],
+['name' => 'Java',    'version' => '17',   'judge0_id' => 62, 'monaco_language' => 'java',    'dolos_language' => 'java',   'codeql_language' => 'java',   'file_extensions' => ['java']],
+['name' => 'C',       'version' => '11',   'judge0_id' => 50, 'monaco_language' => 'c',       'dolos_language' => 'c',      'codeql_language' => 'cpp',    'file_extensions' => ['c']],
+['name' => 'C++',     'version' => '17',   'judge0_id' => 54, 'monaco_language' => 'cpp',     'dolos_language' => 'cpp',    'codeql_language' => 'cpp',    'file_extensions' => ['cpp', 'cc', 'cxx']],
 ```
 
 **NOTE**: When upgrading Judge0 CE version, verify `judge0_id` mappings have not changed.
