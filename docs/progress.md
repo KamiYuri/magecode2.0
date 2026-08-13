@@ -34,7 +34,7 @@
 | B8 problems + test cases lifecycle | P0 | done | `ed83290` | Visibility resolved in `ProblemVisibilityService` + `Problem::visibleIn()` — keep the two in step. Clone-from-bank stays with B10, match-groups with Plan D |
 | B9 tags | P2 | todo | — | — |
 | B10 problem bank | P1 | todo | — | — |
-| B11 route conformance /api/v1 | P0 | todo | — | — |
+| B11 route conformance /api/v1 | P0 | wip | `api/feat/route-conformance` | — |
 | B12 profile + notifications | P2 | todo | — | — |
 
 ## M2 — Plan C: Submission Loop & CES

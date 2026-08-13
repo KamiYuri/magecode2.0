@@ -119,6 +119,8 @@ tags:
     description: Data export — grades, submissions, analysis results
   - name: System Admin
     description: Platform administration (seeded admin only)
+  - name: System
+    description: Operational endpoints — readiness probe for Traefik and the compose healthcheck
 
 security:
   - BearerAuth: []
@@ -265,6 +267,13 @@ components:
       type: string
       format: date-time
       example: "2026-03-18T10:00:00Z"
+    Health:
+      type: object
+      properties:
+        status: { type: string, enum: [ok, unavailable] }
+        service: { type: string, example: "api" }
+        database: { type: string, enum: [ok, unavailable] }
+        timestamp: { $ref: '#/components/schemas/Timestamp' }
 
     # ── Auth ──
     LoginRequest:
@@ -1044,6 +1053,33 @@ components:
 # PATHS
 # ═══════════════════════════════════════════════════════════
 paths:
+
+  # ── SYSTEM ──
+  /health:
+    get:
+      tags: [System]
+      operationId: health
+      summary: "Readiness probe. Unauthenticated; also served unversioned at /api/health."
+      description: |
+        Reports 503 when a dependency the API cannot serve without is
+        unreachable, so Traefik and the compose healthcheck stop routing here.
+      security: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Health' }
+        '503':
+          description: A dependency is unreachable
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Health' }
 
   # ── AUTH ──
   /auth/login:
