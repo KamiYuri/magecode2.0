@@ -24,6 +24,16 @@ class CoursePolicy
             || $this->belongsToASectionOf($user, $course);
     }
 
+    /**
+     * Listing an organization's courses follows the same two routes in as
+     * reading one; which courses come back is the query's business.
+     */
+    public function viewAny(User $user, Organization $organization): bool
+    {
+        return $this->memberships->isOrganizationMember($user, $organization)
+            || $this->belongsToASectionIn($user, $organization);
+    }
+
     public function create(User $user, Organization $organization): bool
     {
         return $this->memberships->isOrganizationAdmin($user, $organization);
@@ -43,6 +53,16 @@ class CoursePolicy
     {
         return $user->sectionMemberships()
             ->whereHas('section.semester', fn ($query) => $query->where('course_id', $course->id))
+            ->exists();
+    }
+
+    private function belongsToASectionIn(User $user, Organization $organization): bool
+    {
+        return $user->sectionMemberships()
+            ->whereHas(
+                'section.semester.course',
+                fn ($query) => $query->where('organization_id', $organization->id)
+            )
             ->exists();
     }
 }
