@@ -4,9 +4,13 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\UnprocessableException;
 use App\Http\Requests\Problem\ListProblemsRequest;
+use App\Http\Requests\Problem\ReorderProblemsRequest;
 use App\Http\Requests\Problem\ShowProblemRequest;
 use App\Http\Requests\Problem\StoreProblemRequest;
+use App\Http\Requests\Problem\ToggleLockRequest;
+use App\Http\Requests\Problem\TogglePublishRequest;
 use App\Http\Requests\Problem\UpdateProblemRequest;
 use App\Http\Resources\ProblemDetailResource;
 use App\Http\Resources\ProblemResource;
@@ -15,8 +19,10 @@ use App\Models\Section;
 use App\Models\User;
 use App\Services\MembershipService;
 use App\Services\ProblemService;
+use App\Services\ProblemVisibilityService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 
 class ProblemController extends Controller
@@ -32,6 +38,7 @@ class ProblemController extends Controller
     public function __construct(
         private readonly ProblemService $problems,
         private readonly MembershipService $memberships,
+        private readonly ProblemVisibilityService $visibility,
     ) {}
 
     /**
@@ -117,6 +124,33 @@ class ProblemController extends Controller
         ]);
     }
 
+    /**
+     * Manual publish. Denied when the semester pins the mode for everyone
+     * below the Org Admin (D-16) — a final exam that must open at one time
+     * across every section.
+     */
+    public function publish(TogglePublishRequest $request, Problem $problem): JsonResponse
+    {
+        return $this->toggle($request, $problem, 'is_published', $request->boolean('is_published'));
+    }
+
+    public function lock(ToggleLockRequest $request, Problem $problem): JsonResponse
+    {
+        return $this->toggle($request, $problem, 'is_locked', $request->boolean('is_locked'));
+    }
+
+    /** Bulk reorder within one section (D-44). */
+    public function reorder(ReorderProblemsRequest $request, Section $section): JsonResponse
+    {
+        $this->authorize('create', [Problem::class, $section]);
+
+        /** @var array<int, array{problem_id: int, order: int, group_label?: string|null}> $entries */
+        $entries = $request->validated('order');
+        $this->problems->reorder($section, $entries);
+
+        return response()->json(['data' => ['message' => __('Order updated.')]]);
+    }
+
     /** Soft delete (D-43): the problem leaves the UI, submissions stay (D-52). */
     public function destroy(Problem $problem): Response
     {
@@ -125,6 +159,28 @@ class ProblemController extends Controller
         $problem->delete();
 
         return response()->noContent();
+    }
+
+    private function toggle(Request $request, Problem $problem, string $flag, bool $value): JsonResponse
+    {
+        $this->authorize('update', $problem);
+
+        /** @var User $user */
+        $user = $request->user();
+        $administers = $this->memberships->administersSection($user, $problem->section);
+        $semester = $problem->section->semester;
+
+        $permitted = $flag === 'is_published'
+            ? $this->visibility->mayOverridePublish($semester, $administers)
+            : $this->visibility->mayOverrideLock($semester, $administers);
+
+        if (! $permitted) {
+            throw UnprocessableException::policyOverrideDenied();
+        }
+
+        $problem->forceFill([$flag => $value])->save();
+
+        return response()->json(['data' => $this->detail($problem, $user)]);
     }
 
     /** @param  array<int, string>  $relations */

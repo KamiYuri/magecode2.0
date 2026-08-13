@@ -91,7 +91,12 @@ Route::prefix('v1')->group(function (): void {
             ->name('sections.problems.index');
         Route::post('sections/{section}/problems', [ProblemController::class, 'store'])
             ->name('sections.problems.store');
+        Route::put('sections/{section}/problems/reorder', [ProblemController::class, 'reorder'])
+            ->name('sections.problems.reorder');
         Route::get('problems/{problem}', [ProblemController::class, 'show'])->name('problems.show');
+        Route::patch('problems/{problem}/publish', [ProblemController::class, 'publish'])
+            ->name('problems.publish');
+        Route::patch('problems/{problem}/lock', [ProblemController::class, 'lock'])->name('problems.lock');
         Route::put('problems/{problem}', [ProblemController::class, 'update'])->name('problems.update');
         Route::delete('problems/{problem}', [ProblemController::class, 'destroy'])->name('problems.destroy');
     });

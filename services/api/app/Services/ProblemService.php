@@ -73,6 +73,26 @@ class ProblemService
         });
     }
 
+    /**
+     * D-44 display order. Written one row at a time rather than as a bulk
+     * CASE statement so the edit-log observer sees each move.
+     *
+     * @param  array<int, array{problem_id: int, order: int, group_label?: string|null}>  $entries
+     */
+    public function reorder(Section $section, array $entries): void
+    {
+        DB::transaction(function () use ($section, $entries): void {
+            foreach ($entries as $entry) {
+                $problem = $section->problems()->findOrFail($entry['problem_id']);
+
+                $problem->fill(array_key_exists('group_label', $entry)
+                    ? ['order' => $entry['order'], 'group_label' => $entry['group_label']]
+                    : ['order' => $entry['order']]);
+                $problem->save();
+            }
+        });
+    }
+
     /** Existing work was judged under the old rules; say so (D-41). */
     public function flagSubmissionsOutdated(Problem $problem): int
     {

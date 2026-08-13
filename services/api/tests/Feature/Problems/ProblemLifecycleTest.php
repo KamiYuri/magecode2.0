@@ -178,8 +178,9 @@ class ProblemLifecycleTest extends TestCase
             ],
         ])->assertOk();
 
-        $this->assertSame(1, $second->fresh()?->order);
-        $this->assertSame('Week 1', $second->fresh()?->group_label);
+        $second->refresh();
+        $this->assertSame(1, $second->order);
+        $this->assertSame('Week 1', $second->group_label);
         $this->assertSame(2, $first->fresh()?->order);
     }
 
