@@ -28,6 +28,9 @@ services:
     build:
       context: ./services/api
       dockerfile: Dockerfile
+      # Without this the build stops at the Dockerfile's last stage, which is
+      # the test image and carries no application code.
+      target: api
     container_name: magecode-api
     labels:
       - service=api
