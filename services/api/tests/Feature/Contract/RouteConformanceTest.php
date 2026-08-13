@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Contract;
 
+use App\Http\Requests\Problem\ListProblemsRequest;
+use App\Http\Requests\Problem\ShowProblemRequest;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -165,6 +167,21 @@ class RouteConformanceTest extends TestCase
         ));
     }
 
+    /**
+     * `?include=` is enumerated per operation rather than shared (D-91), so
+     * the allowlist in each request class is a copy of the contract's enum and
+     * has to be checked against it. Only three operations declare one; the
+     * third belongs to D8 and has no request class yet.
+     */
+    public function test_the_include_allowlists_match_the_contract(): void
+    {
+        $declared = $this->specIncludeEnums();
+
+        $this->assertCount(3, $declared, 'The number of operations declaring `include` changed.');
+        $this->assertContains(ListProblemsRequest::INCLUDABLE, $declared);
+        $this->assertContains(ShowProblemRequest::INCLUDABLE, $declared);
+    }
+
     public function test_every_api_route_lives_under_the_version_prefix(): void
     {
         $unversioned = collect(Route::getRoutes()->getRoutes())
@@ -268,6 +285,37 @@ class RouteConformanceTest extends TestCase
         sort($operations);
 
         return array_values(array_unique($operations));
+    }
+
+    /**
+     * The enum of every inline `include` parameter, in declaration order. The
+     * deprecated shared `QueryInclude` component carries no enum and so does
+     * not appear.
+     *
+     * @return array<int, array<int, string>>
+     */
+    private function specIncludeEnums(): array
+    {
+        $lines = file($this->specPath(), FILE_IGNORE_NEW_LINES);
+        $this->assertNotFalse($lines);
+
+        $enums = [];
+        $pending = false;
+
+        foreach ($lines as $line) {
+            if (preg_match('/^\s*-\s*name: include\s*$/', $line) === 1) {
+                $pending = true;
+
+                continue;
+            }
+
+            if ($pending && preg_match('/enum:\s*\[([^\]]+)\]/', $line, $matches) === 1) {
+                $enums[] = array_map('trim', explode(',', $matches[1]));
+                $pending = false;
+            }
+        }
+
+        return $enums;
     }
 
     /**
