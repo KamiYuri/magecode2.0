@@ -6,9 +6,12 @@ use App\Http\Controllers\Admin;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Auth\EmailVerificationController;
 use App\Http\Controllers\Auth\PasswordResetController;
+use App\Http\Controllers\CourseController;
 use App\Http\Controllers\HealthController;
 use App\Http\Controllers\OrganizationController;
 use App\Http\Controllers\OrganizationMemberController;
+use App\Http\Controllers\SectionController;
+use App\Http\Controllers\SemesterController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -63,6 +66,25 @@ Route::prefix('v1')->group(function (): void {
             Route::delete('organizations/{organization}/members/{member}', [OrganizationMemberController::class, 'destroy'])
                 ->name('organizations.members.destroy');
         });
+
+        Route::get('organizations/{organization}/courses', [CourseController::class, 'index'])
+            ->name('organizations.courses.index');
+        Route::post('organizations/{organization}/courses', [CourseController::class, 'store'])
+            ->name('organizations.courses.store');
+        Route::get('courses/{course}', [CourseController::class, 'show'])->name('courses.show');
+        Route::put('courses/{course}', [CourseController::class, 'update'])->name('courses.update');
+
+        Route::get('courses/{course}/semesters', [SemesterController::class, 'index'])->name('courses.semesters.index');
+        Route::post('courses/{course}/semesters', [SemesterController::class, 'store'])->name('courses.semesters.store');
+        Route::get('semesters/{semester}', [SemesterController::class, 'show'])->name('semesters.show');
+        Route::put('semesters/{semester}', [SemesterController::class, 'update'])->name('semesters.update');
+
+        Route::get('semesters/{semester}/sections', [SectionController::class, 'index'])
+            ->name('semesters.sections.index');
+        Route::post('semesters/{semester}/sections', [SectionController::class, 'store'])
+            ->name('semesters.sections.store');
+        Route::get('sections/{section}', [SectionController::class, 'show'])->name('sections.show');
+        Route::put('sections/{section}', [SectionController::class, 'update'])->name('sections.update');
     });
 });
 
