@@ -38,7 +38,10 @@ dev-reverb:
 	cd services/api && php artisan reverb:start --port=8080 $(if $(debug),--debug,)
 
 # ── API quality gates (run in Docker: host PHP lacks pdo_pgsql/amqp) ──
+# The contract is mounted one level above the app root so the suite's route
+# conformance test finds it by walking up, exactly as it does on the host.
 API_RUN = docker run --rm --network magecode-backend -v $(PWD)/services/api:/var/www/html \
+	-v $(PWD)/docs/api-contracts:/var/www/docs/api-contracts:ro \
 	-e DB_HOST=postgres -e DB_PORT=5432 magecode-api:test
 
 api-image:

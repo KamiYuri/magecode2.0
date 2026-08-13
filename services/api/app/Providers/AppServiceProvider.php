@@ -21,12 +21,30 @@ class AppServiceProvider extends ServiceProvider
         $this->configureRateLimiters();
     }
 
-    /** Limits from the rate-limit table in openapi.yml. */
+    /**
+     * Limits from the rate-limit table in openapi.yml.
+     *
+     * Everything but `auth` is keyed per user, not per IP: a lab full of
+     * students shares an address, and one of them exhausting a limit must not
+     * close the door on the rest (U-3). `auth` is the deliberate exception —
+     * before login there is no user to key on, and per-IP is the point.
+     *
+     * The submission, analysis and upload limiters are defined here before
+     * their endpoints exist, so C2, D1, B7 and B12 attach a name instead of
+     * choosing a number.
+     */
     private function configureRateLimiters(): void
     {
         RateLimiter::for('auth', fn (Request $request): Limit => Limit::perMinute(10)->by($request->ip()));
 
-        RateLimiter::for('api', fn (Request $request): Limit => Limit::perMinute(120)
-            ->by($request->user()?->getAuthIdentifier() ?? $request->ip()));
+        foreach (['api' => 120, 'submissions' => 10, 'analysis' => 5, 'uploads' => 10] as $name => $perMinute) {
+            RateLimiter::for($name, fn (Request $request): Limit => Limit::perMinute($perMinute)
+                ->by($this->callerKey($request)));
+        }
+    }
+
+    private function callerKey(Request $request): string
+    {
+        return (string) ($request->user()?->getAuthIdentifier() ?? $request->ip());
     }
 }

@@ -6,9 +6,12 @@ Single writer to PostgreSQL in the batch path (D-80) and the only service expose
 through Traefik (D-86).
 
 ## Status
-Through B8: migrations + models + seeders, auth, the RBAC policy layer, CRUD for
-organizations/courses/semesters/sections + org members, and the problem & test-case
-lifecycle. Next: B7 roster import/transfer, B10 problem bank, B11 route conformance.
+Through B8 + B11: migrations + models + seeders, auth, the RBAC policy layer, CRUD for
+organizations/courses/semesters/sections + org members, the problem & test-case lifecycle,
+and the route/envelope contract tests. Next: B7 roster import/transfer, B10 problem bank.
+
+**Adding an endpoint?** `tests/Feature/Contract/RouteConformanceTest.php` fails until the
+route matches openapi.yml — strike your operation from its `PENDING` list in the same commit.
 
 ## Tech Stack
 PHP 8.4 (Docker) / 8.3+ (host constraint `^8.3`), Laravel 13, Sanctum bearer tokens,
