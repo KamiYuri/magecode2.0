@@ -75,6 +75,18 @@ class ApiConventionsTest extends TestCase
         $this->assertArrayNotHasKey('errors', $body);
     }
 
+    public function test_a_guest_without_an_accept_header_still_gets_401(): void
+    {
+        // A browser or a plain curl sends no Accept: application/json.
+        // Laravel's default is to redirect guests to a `login` route, which
+        // this service does not serve — that turned every such request into a
+        // 500. The API speaks JSON only, so a guest is always 401.
+        $response = $this->get('/api/v1/organizations');
+
+        $response->assertUnauthorized();
+        $this->assertSame('Unauthenticated.', $response->json('message'));
+    }
+
     public function test_a_denied_request_reports_the_error_shape(): void
     {
         $organization = $this->organizationWithAdmin();

@@ -15,7 +15,10 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+        // This service serves JSON and nothing else. Laravel's default sends
+        // guests to a `login` route, which does not exist here, so the
+        // redirect threw before the 401 could be rendered.
+        $middleware->redirectGuestsTo(fn (): ?string => null);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

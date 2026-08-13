@@ -1,0 +1,6 @@
+email,student_id,first_name,last_name,role
+an.nguyen@sis.hust.edu.vn,20210001,An,Nguyễn,student
+not-an-email,20210004,Bad,Row,student
+,20210005,No,Email,student
+duong.pham@sis.hust.edu.vn,20210006,Dương,Phạm,wizard
+an.nguyen@sis.hust.edu.vn,20210001,An,Nguyễn,student
