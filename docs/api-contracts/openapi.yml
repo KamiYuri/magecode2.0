@@ -1699,7 +1699,7 @@ paths:
                       added: { type: integer }
                       skipped: { type: integer }
                       invited: { type: integer }
-        '422': { description: "Student already in another section (D-51)" }
+        '422': { description: "Student already in another section of this course this semester (code: DUPLICATE_ENROLLMENT, D-51)" }
 
   /sections/{section_id}/members/import:
     post:
@@ -1778,7 +1778,7 @@ paths:
             schema: { $ref: '#/components/schemas/TransferStudentRequest' }
       responses:
         '200': { description: Transferred and logged }
-        '422': { description: Target section not in same semester }
+        '422': { description: "Target section not in same semester (code: TRANSFER_OUTSIDE_SEMESTER), or the membership is not a student enrolment (code: TRANSFER_NOT_A_STUDENT)" }
 
   # ── PROBLEMS ──
   /sections/{section_id}/problems:
