@@ -10,8 +10,10 @@ use App\Http\Controllers\CourseController;
 use App\Http\Controllers\HealthController;
 use App\Http\Controllers\OrganizationController;
 use App\Http\Controllers\OrganizationMemberController;
+use App\Http\Controllers\ProblemController;
 use App\Http\Controllers\SectionController;
 use App\Http\Controllers\SemesterController;
+use App\Http\Controllers\TestCaseController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -85,6 +87,24 @@ Route::prefix('v1')->group(function (): void {
             ->name('semesters.sections.store');
         Route::get('sections/{section}', [SectionController::class, 'show'])->name('sections.show');
         Route::put('sections/{section}', [SectionController::class, 'update'])->name('sections.update');
+
+        Route::get('sections/{section}/problems', [ProblemController::class, 'index'])
+            ->name('sections.problems.index');
+        Route::post('sections/{section}/problems', [ProblemController::class, 'store'])
+            ->name('sections.problems.store');
+        Route::put('sections/{section}/problems/reorder', [ProblemController::class, 'reorder'])
+            ->name('sections.problems.reorder');
+        Route::get('problems/{problem}', [ProblemController::class, 'show'])->name('problems.show');
+        Route::patch('problems/{problem}/publish', [ProblemController::class, 'publish'])
+            ->name('problems.publish');
+        Route::patch('problems/{problem}/lock', [ProblemController::class, 'lock'])->name('problems.lock');
+        Route::put('problems/{problem}', [ProblemController::class, 'update'])->name('problems.update');
+        Route::delete('problems/{problem}', [ProblemController::class, 'destroy'])->name('problems.destroy');
+
+        Route::get('problems/{problem}/test-cases', [TestCaseController::class, 'index'])
+            ->name('problems.test-cases.index');
+        Route::put('problems/{problem}/test-cases', [TestCaseController::class, 'update'])
+            ->name('problems.test-cases.update');
     });
 });
 
