@@ -51,7 +51,11 @@ services:
       DB_DATABASE: ${POSTGRES_DB}
       DB_USERNAME: ${POSTGRES_USER}
       DB_PASSWORD: ${POSTGRES_PASSWORD}
-      QUEUE_CONNECTION: rabbitmq
+      # Laravel's own queue, not RabbitMQ: `rabbitmq` is not a driver
+      # config/queue.php knows, so any dispatch() threw "Driver [rabbitmq] not
+      # supported". Jobs for the Go workers go out through App\Messaging, which
+      # speaks AMQP directly and reads the RABBITMQ_* variables below.
+      QUEUE_CONNECTION: database
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_PORT: 5672
       RABBITMQ_USER: ${RABBITMQ_DEFAULT_USER}
