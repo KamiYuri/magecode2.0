@@ -18,6 +18,10 @@ import (
 // Version is the only schema version this build understands.
 const Version = "1.0"
 
+// QueueName is the job queue and, per the result schema, this service's
+// identifier in the messages it sends back.
+const QueueName = "code-executor"
+
 // CodeExecution is one job: a submission id and the tracing metadata that
 // travels with it. D-84 keeps the payload this small because CES reads
 // everything else — test cases, language, file path — straight from the

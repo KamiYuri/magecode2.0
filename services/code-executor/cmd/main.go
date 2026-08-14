@@ -11,14 +11,18 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	cesconfig "github.com/magecode/code-executor/internal/config"
+	"github.com/magecode/code-executor/internal/grader"
 	"github.com/magecode/code-executor/internal/job"
+	"github.com/magecode/code-executor/internal/judge0"
 	"github.com/magecode/code-executor/internal/repository"
 	"github.com/magecode/shared/go/config"
 	"github.com/magecode/shared/go/db"
 	"github.com/magecode/shared/go/logger"
 	"github.com/magecode/shared/go/rmq"
+	"github.com/magecode/shared/go/storage"
 )
 
 // serviceName is both the D-26 service identifier and the job queue name.
@@ -33,6 +37,9 @@ const (
 	// defaultDBPort is PgBouncer's, not Postgres's — CES never dials the
 	// database directly (D-89).
 	defaultDBPort = "6432"
+	// defaultJudge0Timeout comfortably exceeds the 30s ceiling openapi puts on
+	// a problem's time_limit, plus Judge0's own queueing.
+	defaultJudge0Timeout = "60s"
 )
 
 func main() {
@@ -49,6 +56,19 @@ func main() {
 		"DB_NAME":      {Required: true},
 		"DB_USER":      {Required: true},
 		"DB_PASSWORD":  {Required: true},
+
+		"MINIO_ENDPOINT":   {Required: true},
+		"MINIO_ACCESS_KEY": {Required: true},
+		"MINIO_SECRET_KEY": {Required: true},
+		"MINIO_BUCKET":     {Required: true},
+		"MINIO_USE_SSL":    {Type: config.Bool, Default: "false"},
+
+		"JUDGE0_URL":        {Required: true},
+		"JUDGE0_AUTH_TOKEN": {Required: true},
+		// Bounds one call to Judge0. It must exceed any problem's own time
+		// limit (30s ceiling per openapi) or CES would abandon a program
+		// Judge0 is still legitimately running.
+		"JUDGE0_TIMEOUT": {Type: config.Duration, Default: defaultJudge0Timeout},
 	})
 	if err != nil {
 		log.Error("loading config", logger.Err(err))
@@ -74,6 +94,26 @@ func main() {
 	}
 	defer pool.Close()
 
+	objects, err := storage.New(ctx, storage.Config{
+		Endpoint:  cfg.String("MINIO_ENDPOINT"),
+		AccessKey: cfg.String("MINIO_ACCESS_KEY"),
+		SecretKey: cfg.String("MINIO_SECRET_KEY"),
+		Bucket:    cfg.String("MINIO_BUCKET"),
+		UseSSL:    cfg.Bool("MINIO_USE_SSL"),
+	})
+	if err != nil {
+		log.Error("connecting to minio", logger.Err(err))
+		os.Exit(1)
+	}
+
+	// CES reads MinIO directly; pre-signed URLs are for the stateless batch
+	// workers (D-85).
+	runner := judge0.New(judge0.Config{
+		BaseURL:   cfg.String("JUDGE0_URL"),
+		AuthToken: cfg.String("JUDGE0_AUTH_TOKEN"),
+		Timeout:   cfg.Duration("JUDGE0_TIMEOUT"),
+	})
+
 	consumer, err := rmq.NewConsumer(ctx, rmq.Config{
 		URL:           cfg.String("RABBITMQ_URL"),
 		PrefetchCount: cfg.Int("RMQ_PREFETCH"),
@@ -92,7 +132,18 @@ func main() {
 		"workers":  cfg.Int("WORKER_COUNT"),
 	})
 
-	err = consumer.Consume(ctx, serviceName, execute(log, repository.New(pool)))
+	// Separate connection from the consumer's: a publisher sharing a channel
+	// with the delivery loop would serialise signalling behind grading.
+	publisher, err := rmq.NewPublisher(ctx, rmq.Config{URL: cfg.String("RABBITMQ_URL"), Logger: log})
+	if err != nil {
+		log.Error("opening result publisher", logger.Err(err))
+		os.Exit(1)
+	}
+	defer publisher.Close()
+
+	engine := grader.New(repository.New(pool), objects, runner, &signaller{publisher: publisher, log: log}, log)
+
+	err = consumer.Consume(ctx, serviceName, execute(log, engine, publisher))
 	if err != nil {
 		log.Error("consumer stopped", logger.Err(err))
 		os.Exit(1)
@@ -107,7 +158,7 @@ func main() {
 // (D-79e). That is why decoding failures are Permanent and why the work to
 // come — database reads and Judge0 calls — must classify its own errors
 // rather than returning bare ones.
-func execute(log *slog.Logger, repo *repository.Repository) rmq.Handler {
+func execute(log *slog.Logger, engine *grader.Grader, publisher rmq.Publisher) rmq.Handler {
 	return func(ctx context.Context, d rmq.Delivery) error {
 		decoded, err := job.Decode(d.Body)
 		if err != nil {
@@ -118,41 +169,81 @@ func execute(log *slog.Logger, repo *repository.Repository) rmq.Handler {
 			return err
 		}
 
-		graded, err := repo.Load(ctx, decoded.SubmissionID)
+		log.Info("grading submission", "trace_id", decoded.TraceID, "data", map[string]any{
+			"submission_id": decoded.SubmissionID,
+			"retry_count":   d.RetryCount,
+		})
+
+		summary, err := engine.Grade(ctx, decoded.SubmissionID, decoded.TraceID)
 		if err != nil {
-			log.Error("loading submission", logger.Err(err), "trace_id", decoded.TraceID,
+			log.Error("grading failed", logger.Err(err), "trace_id", decoded.TraceID,
 				"data", map[string]any{"submission_id": decoded.SubmissionID})
 			return err
 		}
 
-		log.Info("grading submission", "trace_id", decoded.TraceID, "data", map[string]any{
-			"submission_id": graded.SubmissionID,
-			"test_cases":    len(graded.TestCases),
-			"retry_count":   d.RetryCount,
-		})
-
-		if err := repo.MarkProcessing(ctx, graded.SubmissionID); err != nil {
-			return err
-		}
-
-		// C6 runs graded.TestCases through Judge0 and calls repo.SaveResult
-		// for each verdict. Until then the recount below sees no results,
-		// which is the honest answer for a submission nothing has graded.
-
-		summary, err := repo.Finalise(ctx, graded.SubmissionID)
-		if err != nil {
-			return err
-		}
-
 		log.Info("submission graded", "trace_id", decoded.TraceID, "data", map[string]any{
-			"submission_id":    graded.SubmissionID,
+			"submission_id":    decoded.SubmissionID,
 			"execution_status": string(summary.Status),
 			"testcases_passed": summary.Passed,
 			"testcases_total":  summary.Total,
 		})
 
-		// C7 publishes result-execution here so api can push the verdict to
-		// the student over WebSocket (D-83).
+		// Signal api so it can push the verdict to the student (D-83). The
+		// results are already in the database, so a failure to signal costs
+		// the live update and not the grade — the student sees the verdict on
+		// their next page load either way. Retrying the whole delivery for it
+		// would re-run every test case through Judge0 to fix a WebSocket
+		// frame, so the failure is logged and the message is acked.
+		signal := job.Completed(decoded.SubmissionID, summary, decoded.TraceID, time.Now())
+
+		body, err := signal.Encode()
+		if err != nil {
+			log.Error("encoding result signal", logger.Err(err), "trace_id", decoded.TraceID)
+			return nil
+		}
+
+		if err := publisher.Publish(ctx, signal.Queue(), body, signal.TraceIdentifier()); err != nil {
+			log.Error("publishing result signal", logger.Err(err), "trace_id", decoded.TraceID,
+				"data", map[string]any{"submission_id": decoded.SubmissionID, "queue": signal.Queue()})
+		}
+
 		return nil
+	}
+}
+
+// signaller turns grading progress into `result.execution` messages.
+//
+// It never returns an error: the results are already in the database, so a
+// broker that will not take a progress frame costs the live update and not the
+// grade. Failing the delivery instead would re-run every test case through
+// Judge0 to retry a WebSocket frame.
+type signaller struct {
+	publisher rmq.Publisher
+	log       *slog.Logger
+}
+
+func (s *signaller) TestCaseFinished(ctx context.Context, update grader.Update) {
+	message := job.Progress(
+		update.SubmissionID,
+		update.Passed,
+		update.Total,
+		job.LatestResult{TestCaseOrder: update.Order, Status: string(update.Status)},
+		update.TraceID,
+		time.Now(),
+	)
+
+	s.publish(ctx, message, update.SubmissionID)
+}
+
+func (s *signaller) publish(ctx context.Context, message job.ExecutionResult, submissionID int64) {
+	body, err := message.Encode()
+	if err != nil {
+		s.log.Error("encoding result signal", logger.Err(err), "trace_id", message.TraceID)
+		return
+	}
+
+	if err := s.publisher.Publish(ctx, message.Queue(), body, message.TraceIdentifier()); err != nil {
+		s.log.Error("publishing result signal", logger.Err(err), "trace_id", message.TraceID,
+			"data", map[string]any{"submission_id": submissionID, "status": message.Status})
 	}
 }
