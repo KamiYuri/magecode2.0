@@ -99,8 +99,14 @@ func jobWith(testCases int) repository.Job {
 	return job
 }
 
+type fakeNotifier struct{ updates []Update }
+
+func (f *fakeNotifier) TestCaseFinished(_ context.Context, u Update) {
+	f.updates = append(f.updates, u)
+}
+
 func newGrader(store *fakeStore, source fakeSource, runner *fakeRunner) *Grader {
-	return New(store, source, runner, slog.New(slog.DiscardHandler))
+	return New(store, source, runner, &fakeNotifier{}, slog.New(slog.DiscardHandler))
 }
 
 func TestGradeRunsEveryTestCaseAndStoresEachVerdict(t *testing.T) {
@@ -248,5 +254,63 @@ func TestGradeFinalisesEvenWithNoTestCases(t *testing.T) {
 	}
 	if summary.Status != repository.ExecutionError {
 		t.Errorf("Status = %q, want error", summary.Status)
+	}
+}
+
+// v3 §7: a frame per finished test case, carrying the running tally so the
+// strip fills in as the run goes.
+func TestGradeNotifiesAfterEachTestCase(t *testing.T) {
+	store := &fakeStore{job: jobWith(3)}
+	runner := &fakeRunner{results: []repository.TestCaseResult{
+		{Status: repository.StatusAccepted},
+		{Status: repository.StatusWrongAnswer},
+		{Status: repository.StatusAccepted},
+	}}
+	notifier := &fakeNotifier{}
+
+	if _, err := New(store, fakeSource{body: "x"}, runner, notifier, slog.New(slog.DiscardHandler)).
+		Grade(context.Background(), 42, "trace"); err != nil {
+		t.Fatalf("Grade: %v", err)
+	}
+
+	if len(notifier.updates) != 3 {
+		t.Fatalf("sent %d updates, want one per test case", len(notifier.updates))
+	}
+
+	// The tally is cumulative: 1, then still 1 after the failure, then 2.
+	wantPassed := []int{1, 1, 2}
+	for i, update := range notifier.updates {
+		if update.Passed != wantPassed[i] {
+			t.Errorf("update %d passed = %d, want %d", i, update.Passed, wantPassed[i])
+		}
+		if update.Total != 3 {
+			t.Errorf("update %d total = %d, want 3", i, update.Total)
+		}
+		if update.Order != i {
+			t.Errorf("update %d order = %d, want %d", i, update.Order, i)
+		}
+		if update.TraceID != "trace" {
+			t.Errorf("update %d lost the trace id", i)
+		}
+	}
+	if notifier.updates[1].Status != repository.StatusWrongAnswer {
+		t.Errorf("update 1 status = %q, want the verdict that just happened", notifier.updates[1].Status)
+	}
+}
+
+// The frame follows the write. A student told a cell passed, on a row that is
+// not there yet, would refresh and watch it disappear.
+func TestGradeDoesNotNotifyForAResultItCouldNotStore(t *testing.T) {
+	store := &fakeStore{job: jobWith(2), saveErr: apperror.New(apperror.Transient, "db down")}
+	notifier := &fakeNotifier{}
+
+	_, err := New(store, fakeSource{body: "x"}, &fakeRunner{}, notifier, slog.New(slog.DiscardHandler)).
+		Grade(context.Background(), 42, "trace")
+	if err == nil {
+		t.Fatal("Grade swallowed the store failure")
+	}
+
+	if len(notifier.updates) != 0 {
+		t.Errorf("sent %d updates for results that were never stored", len(notifier.updates))
 	}
 }

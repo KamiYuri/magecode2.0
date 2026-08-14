@@ -36,15 +36,33 @@ type Runner interface {
 	Run(ctx context.Context, job repository.Job, testCase repository.TestCase, source string) (repository.TestCaseResult, error)
 }
 
-type Grader struct {
-	store  Store
-	source Source
-	runner Runner
-	log    *slog.Logger
+// Notifier is told about each finished test case so the student's verdict
+// strip fills in as the run goes (v3 §7). The wire format lives with the
+// caller; this package only knows that something wants to hear about it.
+type Notifier interface {
+	TestCaseFinished(ctx context.Context, update Update)
 }
 
-func New(store Store, source Source, runner Runner, log *slog.Logger) *Grader {
-	return &Grader{store: store, source: source, runner: runner, log: log}
+// Update is one finished test case, plus the tally so far.
+type Update struct {
+	SubmissionID int64
+	TraceID      string
+	Order        int
+	Status       repository.TestCaseStatus
+	Passed       int
+	Total        int
+}
+
+type Grader struct {
+	store    Store
+	source   Source
+	runner   Runner
+	notifier Notifier
+	log      *slog.Logger
+}
+
+func New(store Store, source Source, runner Runner, notifier Notifier, log *slog.Logger) *Grader {
+	return &Grader{store: store, source: source, runner: runner, notifier: notifier, log: log}
 }
 
 // Grade processes one submission and returns the summary CES signals with.
@@ -67,6 +85,8 @@ func (g *Grader) Grade(ctx context.Context, submissionID int64, traceID string) 
 	if err != nil {
 		return repository.Summary{}, err
 	}
+
+	passed := 0
 
 	for _, testCase := range job.TestCases {
 		result, err := g.runner.Run(ctx, job, testCase, source)
@@ -94,6 +114,21 @@ func (g *Grader) Grade(ctx context.Context, submissionID int64, traceID string) 
 		if err := g.store.SaveResult(ctx, submissionID, result); err != nil {
 			return repository.Summary{}, err
 		}
+
+		if result.Status == repository.StatusAccepted {
+			passed++
+		}
+
+		// After the write, never before: a frame telling the student a cell
+		// passed must not arrive ahead of the row it describes.
+		g.notifier.TestCaseFinished(ctx, Update{
+			SubmissionID: submissionID,
+			TraceID:      traceID,
+			Order:        testCase.Order,
+			Status:       result.Status,
+			Passed:       passed,
+			Total:        len(job.TestCases),
+		})
 	}
 
 	return g.store.Finalise(ctx, submissionID)

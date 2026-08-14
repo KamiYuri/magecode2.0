@@ -240,9 +240,10 @@ String enum values used in `service` field:
 ### 4.1. Queue: `result-execution`
 
 **Direction:** CES → api.
-**Pattern:** 1 message per completed submission.
+**Pattern:** 1 message per finished test case (`status: processing`) plus 1 when the submission is done (`status: completed|error`).
 **Purpose:** Signal for api to push WebSocket to student. CES has already written all results to DB (D-81).
 **Why include execution_status + counts:** Saves api from querying DB just to push a WebSocket notification. Reduces latency for real-time UX.
+**Why progress shares this queue** (v3 §7, 2026-08-14): the `execution.updated` event openapi and `ui-ux-design.md` §4.2 promise needs a per-test-case producer, and putting it on a queue of its own would let a completion overtake the progress messages before it. One queue keeps them ordered.
 
 ```json
 {

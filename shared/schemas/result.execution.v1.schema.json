@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "magecode:queue:result-execution:1.0",
   "title": "CES Result Message",
-  "description": "Signal that CES has finished processing a submission. Results already written to DB by CES (D-81). api uses this to push WebSocket notification to student. Includes execution_status and test case counts so api does not need to query DB.",
+  "description": "Signal from CES about a submission. Results are already written to DB by CES (D-81); api uses these messages to push WebSocket frames to the student, and they carry execution_status and the counts so api never has to query the DB to do it. Two kinds travel on this queue: status=processing after each test case (driving execution.updated), and status=completed|error once (driving execution.completed). They share a queue so a completion can never overtake the progress messages that precede it.",
   "type": "object",
   "required": [
     "submission_id", "service", "status",
@@ -21,16 +21,36 @@
     },
     "status": {
       "type": "string",
-      "enum": ["completed", "error"],
-      "description": "Processing outcome. completed = all test cases processed (pass or fail). error = infrastructure/system error (Judge0 down, DB write failed)."
+      "enum": ["processing", "completed", "error"],
+      "description": "Processing outcome. processing = one test case finished and more remain. completed = all test cases processed (pass or fail). error = infrastructure/system error (Judge0 down, DB write failed)."
     },
     "execution_status": {
       "type": "string",
       "enum": [
-        "accepted", "partially_accepted", "error",
+        "processing", "accepted", "partially_accepted", "error",
         "timeout", "language_not_supported"
       ],
-      "description": "Final submission-level status. Mirrors submissions.execution_status already written to DB by CES."
+      "description": "Submission-level status, mirroring submissions.execution_status as CES has written it. `processing` accompanies status=processing; the rest are final."
+    },
+    "latest_result": {
+      "type": "object",
+      "description": "The test case that just finished. Present only when status=processing — it is what fills one cell of the verdict strip (ui-ux §4.2).",
+      "required": ["test_case_order", "status"],
+      "properties": {
+        "test_case_order": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Position in the run, matching test_cases.order"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "accepted", "wrong_answer", "time_limit_exceeded", "memory_limit_exceeded",
+            "runtime_error", "compilation_error", "internal_error", "timeout"
+          ],
+          "description": "Verdict for that test case"
+        }
+      }
     },
     "testcases_passed": {
       "type": "integer",
