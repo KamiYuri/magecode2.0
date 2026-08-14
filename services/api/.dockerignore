@@ -9,5 +9,9 @@ storage/logs/*
 storage/framework/cache/data/*
 storage/framework/sessions/*
 storage/framework/views/*
+# Storage::fake() writes here, and the suite runs as root inside the test
+# image — so the directory ends up unreadable to the host user and breaks the
+# build context. It is scratch either way and has no business in an image.
+storage/framework/testing/*
 tests/coverage
 vendor
