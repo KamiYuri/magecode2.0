@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Messaging\AmqpPublisher;
+use App\Messaging\JobPublisher;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -13,7 +15,11 @@ class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        //
+        // Singleton so one connection serves the request rather than one per
+        // publish; a test swaps this binding for FakeJobPublisher.
+        $this->app->singleton(JobPublisher::class, fn (): AmqpPublisher => new AmqpPublisher(
+            config('amqp')
+        ));
     }
 
     public function boot(): void
