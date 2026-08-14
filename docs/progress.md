@@ -48,7 +48,7 @@ notifications — and B10, which M5 owns, stay open and can land alongside M2.)
 | C3 amqp publisher | P0 | done | `api/feat/amqp-publisher` | Default exchange, routing key = queue name — the roadmap's `magecode` exchange would have dropped every job. `AmqpPublisher::declareTopology` is a transcription of `shared/go/rmq/client.go`; an integration test redeclares with the Go arguments so drift fails here, not in C4 |
 | C4 ces consumer loop | P0 | done | `ces/feat/consumer-loop` | Concurrency lives in `shared/go/rmq` (`Config.Concurrency`, capped by prefetch) — settling is mutex-guarded because a multi-frame publish is not concurrency-safe on one channel. `job.Decode` is strict; C5/C6 **must classify their errors** or a bare one is retried 3× |
 | C5 ces repository + upsert | P0 | done | `ces/feat/repository` | `SaveResult` upserts on `(submission_id, test_case_id)`; `Finalise` recounts joined to `is_active` and derives the verdict. `DeriveStatus` checks `total == 0` **first** — otherwise an empty test set reports `accepted`. C6 fills the gap between `MarkProcessing` and `Finalise` |
-| C6 ces judge0 client | P0 | todo | — | — |
+| C6 ces judge0 client | P0 | done | `ces/feat/judge0-client` | Status map + memory inference in v3 §7. `internal/grader` owns the sequence (source once, verdict per test case, then recount). **Integration vs real Judge0 not run: host is cgroup v2** |
 | C7 result signalling + reverb | P0 | todo | — | — |
 | C8 e2e submission script | P0 | todo | — | milestone gate M2 |
 
