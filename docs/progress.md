@@ -47,7 +47,7 @@ notifications — and B10, which M5 owns, stay open and can land alongside M2.)
 | C2 submission endpoints + quota | P0 | done | `api/feat/submissions` | 5 endpoints (50 of 90 routed). `SubmissionService` is the only writer — quota + in-flight gate run under `pg_advisory_xact_lock(problem_id, creator_id)`; C3 hangs its publish off the same service. `TrimStrings` now excludes `source_code` |
 | C3 amqp publisher | P0 | done | `api/feat/amqp-publisher` | Default exchange, routing key = queue name — the roadmap's `magecode` exchange would have dropped every job. `AmqpPublisher::declareTopology` is a transcription of `shared/go/rmq/client.go`; an integration test redeclares with the Go arguments so drift fails here, not in C4 |
 | C4 ces consumer loop | P0 | done | `ces/feat/consumer-loop` | Concurrency lives in `shared/go/rmq` (`Config.Concurrency`, capped by prefetch) — settling is mutex-guarded because a multi-frame publish is not concurrency-safe on one channel. `job.Decode` is strict; C5/C6 **must classify their errors** or a bare one is retried 3× |
-| C5 ces repository + upsert | P0 | todo | — | — |
+| C5 ces repository + upsert | P0 | wip | `ces/feat/repository` | — |
 | C6 ces judge0 client | P0 | todo | — | — |
 | C7 result signalling + reverb | P0 | todo | — | — |
 | C8 e2e submission script | P0 | todo | — | milestone gate M2 |
