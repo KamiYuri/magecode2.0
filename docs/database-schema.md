@@ -356,7 +356,7 @@ One student submission of source code for one Problem. **Never deleted** (D-52).
 
 **IMPORTANT for AI agents**:
 - `execution_status`, `testcases_passed`, `testcases_total` are written by CES directly (D-81).
-- CES MUST recount `testcases_passed` and `testcases_total` from `code_execution_results` after all test cases complete to ensure accuracy.
+- CES MUST recount `testcases_passed` and `testcases_total` from `code_execution_results` after all test cases complete to ensure accuracy, **joined to `test_cases` on `is_active = true`** so a deactivated test case leaves the counters at once (v3 §7, 2026-08-14).
 - Quota check: `SELECT COUNT(*) FROM submissions WHERE problem_id = ? AND creator_id = ?`. Use `SELECT ... FOR UPDATE` in transaction to prevent concurrent quota bypass (D-36, D-39).
 
 ```php
@@ -391,12 +391,19 @@ Schema::create('submissions', function (Blueprint $table) {
 | file_name | `string('file_name')` | NOT NULL | Original filename |
 | execution_status | `string(..., 30)` | DEFAULT 'in_queue' | Overall CES status |
 | testcases_passed | `integer(...)` | DEFAULT 0 | Count of passed test cases |
-| testcases_total | `integer(...)` | DEFAULT 0 | Total test cases at submission time |
+| testcases_total | `integer(...)` | DEFAULT 0 | Number of **currently active** test cases, recounted by CES (v3 §7, 2026-08-14) |
 | is_outdated | `boolean(...)` | DEFAULT false | D-41: true when test cases changed after submission |
 | created_at | `timestamps()` | | |
 | updated_at | `timestamps()` | | |
 
 **execution_status values**: `in_queue`, `processing`, `accepted`, `partially_accepted`, `error`, `timeout`, `language_not_supported`
+
+**How CES derives it** (v3 §7, 2026-08-14): after the recount, `passed == total` is `accepted`,
+`passed > 0` is `partially_accepted`, and `passed == 0` is `error` — including a program that
+merely gets every answer wrong, since the enum offers nothing narrower. `timeout` means the
+grading run itself never finished; a test case that timed out is D-37's per-test-case status
+and counts as an ordinary failure. `language_not_supported` is set when Judge0 rejects the
+language before any test case runs.
 
 ---
 
