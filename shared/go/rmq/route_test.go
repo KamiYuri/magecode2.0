@@ -77,16 +77,32 @@ func TestConfigDefaults(t *testing.T) {
 	if cfg.Logger == nil {
 		t.Error("Logger default must not be nil")
 	}
+	if cfg.Concurrency != 1 {
+		t.Errorf("Concurrency = %d, want 1 (sequential unless asked otherwise)", cfg.Concurrency)
+	}
 }
 
 func TestConfigExplicitValuesKept(t *testing.T) {
-	cfg := Config{URL: "amqp://localhost", PrefetchCount: 5, MaxRetries: 1}.withDefaults()
+	cfg := Config{URL: "amqp://localhost", PrefetchCount: 5, MaxRetries: 1, Concurrency: 5}.withDefaults()
 
 	if cfg.PrefetchCount != 5 {
 		t.Errorf("PrefetchCount = %d, want explicit 5 (CES, D-76)", cfg.PrefetchCount)
 	}
 	if cfg.MaxRetries != 1 {
 		t.Errorf("MaxRetries = %d, want explicit 1", cfg.MaxRetries)
+	}
+	if cfg.Concurrency != 5 {
+		t.Errorf("Concurrency = %d, want explicit 5 (CES, D-75)", cfg.Concurrency)
+	}
+}
+
+// A pool larger than the prefetch window has workers that can never be fed,
+// so the window is what actually bounds concurrency.
+func TestConfigConcurrencyCappedByPrefetch(t *testing.T) {
+	cfg := Config{URL: "amqp://localhost", PrefetchCount: 3, Concurrency: 10}.withDefaults()
+
+	if cfg.Concurrency != 3 {
+		t.Errorf("Concurrency = %d, want 3 (capped by PrefetchCount)", cfg.Concurrency)
 	}
 }
 

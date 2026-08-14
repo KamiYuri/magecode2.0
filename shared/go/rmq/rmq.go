@@ -15,6 +15,7 @@ import (
 const (
 	defaultMaxRetries         = 3
 	defaultPrefetchCount      = 1
+	defaultConcurrency        = 1
 	defaultRetryBaseDelay     = time.Second
 	defaultReconnectBaseDelay = 500 * time.Millisecond
 	defaultReconnectMaxDelay  = 30 * time.Second
@@ -31,6 +32,11 @@ type Config struct {
 	// PrefetchCount is the per-consumer unacked message limit (D-76:
 	// CES 5, SIM 1, AID/VUL 3). Default 1.
 	PrefetchCount int
+	// Concurrency is how many handlers run at once inside the prefetch
+	// window (D-75: CES 5). Default 1, which processes deliveries one at a
+	// time. Values above PrefetchCount are capped to it, since a worker the
+	// broker will never feed is only a goroutine.
+	Concurrency int
 	// MaxRetries is the number of delayed retries before a message is
 	// dead-lettered. Default 3 (D-79e).
 	MaxRetries int
@@ -45,6 +51,12 @@ type Config struct {
 func (c Config) withDefaults() Config {
 	if c.PrefetchCount == 0 {
 		c.PrefetchCount = defaultPrefetchCount
+	}
+	if c.Concurrency < 1 {
+		c.Concurrency = defaultConcurrency
+	}
+	if c.Concurrency > c.PrefetchCount {
+		c.Concurrency = c.PrefetchCount
 	}
 	if c.MaxRetries == 0 {
 		c.MaxRetries = defaultMaxRetries
