@@ -80,8 +80,6 @@ class RouteConformanceTest extends TestCase
         ],
         'C2 submissions' => [
             'GET /problems/{}/submissions',
-            'POST /problems/{}/submissions',
-            'POST /problems/{}/submissions/upload',
             'GET /submissions/{}',
             'GET /sections/{}/submissions',
         ],

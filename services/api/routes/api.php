@@ -14,6 +14,7 @@ use App\Http\Controllers\ProblemController;
 use App\Http\Controllers\SectionController;
 use App\Http\Controllers\SectionMemberController;
 use App\Http\Controllers\SemesterController;
+use App\Http\Controllers\SubmissionController;
 use App\Http\Controllers\TestCaseController;
 use Illuminate\Support\Facades\Route;
 
@@ -125,6 +126,16 @@ Route::prefix('v1')->group(function (): void {
             ->name('problems.test-cases.index');
         Route::put('problems/{problem}/test-cases', [TestCaseController::class, 'update'])
             ->name('problems.test-cases.update');
+
+        // Writes carry the tighter `submissions` limiter (U-3); the reads stay
+        // on the global one, since a student refreshing a verdict is not the
+        // traffic that limit exists for.
+        Route::post('problems/{problem}/submissions', [SubmissionController::class, 'store'])
+            ->middleware('throttle:submissions')
+            ->name('problems.submissions.store');
+        Route::post('problems/{problem}/submissions/upload', [SubmissionController::class, 'upload'])
+            ->middleware('throttle:submissions')
+            ->name('problems.submissions.upload');
     });
 });
 
