@@ -51,9 +51,15 @@ MINIO_TEST_ENV = $(if $(MINIO_ROOT_PASSWORD),\
 	-e MINIO_TEST_SECRET_KEY=$(MINIO_ROOT_PASSWORD) \
 	-e MINIO_TEST_BUCKET=$(or $(MINIO_BUCKET),magecode),)
 
+# Same gate for the RabbitMQ-backed publisher tests, keyed on the password .env
+# marks REQUIRED. The URL mirrors RMQ_TEST_URL in the Go integration suites.
+RMQ_TEST_ENV = $(if $(RABBITMQ_DEFAULT_PASS),\
+	-e RMQ_TEST_URL=amqp://$(or $(RABBITMQ_DEFAULT_USER),magecode):$(RABBITMQ_DEFAULT_PASS)@rabbitmq:5672/$(or $(RABBITMQ_DEFAULT_VHOST),magecode),)
+
 API_RUN = docker run --rm --network magecode-backend -v $(PWD)/services/api:/var/www/html \
 	-v $(PWD)/docs/api-contracts:/var/www/docs/api-contracts:ro \
-	-e DB_HOST=postgres -e DB_PORT=5432 $(MINIO_TEST_ENV) magecode-api:test
+	-v $(PWD)/shared/schemas:/var/www/shared/schemas:ro \
+	-e DB_HOST=postgres -e DB_PORT=5432 $(MINIO_TEST_ENV) $(RMQ_TEST_ENV) magecode-api:test
 
 api-image:
 	docker build --target test -t magecode-api:test services/api

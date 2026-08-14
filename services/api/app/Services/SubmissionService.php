@@ -6,6 +6,9 @@ namespace App\Services;
 
 use App\Enums\ExecutionStatus;
 use App\Exceptions\UnprocessableException;
+use App\Messaging\JobPublisher;
+use App\Messaging\Jobs\CodeExecutorJob;
+use App\Messaging\PublishFailed;
 use App\Models\Problem;
 use App\Models\ProgrammingLanguage;
 use App\Models\Submission;
@@ -13,6 +16,7 @@ use App\Models\User;
 use Closure;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Throwable;
 
 /**
@@ -29,6 +33,7 @@ class SubmissionService
     public function __construct(
         private readonly ProblemVisibilityService $visibility,
         private readonly SubmissionStorageService $storage,
+        private readonly JobPublisher $publisher,
     ) {}
 
     public function submitSource(
@@ -79,7 +84,7 @@ class SubmissionService
         $stored = null;
 
         try {
-            return DB::transaction(function () use ($problem, $student, $language, $write, &$stored): Submission {
+            $submission = DB::transaction(function () use ($problem, $student, $language, $write, &$stored): Submission {
                 $this->serialiseSubmitter($problem, $student);
                 $this->assertNothingInFlight($problem, $student);
                 $this->assertQuotaRemains($problem, $student);
@@ -110,6 +115,36 @@ class SubmissionService
             }
 
             throw $failure;
+        }
+
+        $this->requestExecution($submission);
+
+        return $submission;
+    }
+
+    /**
+     * Wake CES — after the commit, never inside it. A message names an id
+     * (D-84), and an id from a rolled-back transaction is a job that can never
+     * succeed.
+     *
+     * A broker that refuses is not the student's problem: the submission is
+     * already durable in Postgres and MinIO, so the failure is logged with the
+     * id a later sweep needs and the row waits at `in_queue` (v3 §7,
+     * 2026-08-14). Re-publishing it belongs to C7/D7.
+     */
+    private function requestExecution(Submission $submission): void
+    {
+        $job = CodeExecutorJob::for($submission->id);
+
+        try {
+            $this->publisher->publish($job);
+        } catch (PublishFailed $failure) {
+            Log::error('could not queue submission for execution', [
+                'submission_id' => $submission->id,
+                'trace_id' => $job->traceId(),
+                'queue' => $job->queue(),
+                'error' => $failure->getMessage(),
+            ]);
         }
     }
 

@@ -8,6 +8,7 @@ use App\Http\Requests\Problem\ListProblemsRequest;
 use App\Http\Requests\Problem\ShowProblemRequest;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
+use Tests\Support\FindsRepositoryFile;
 use Tests\TestCase;
 
 /**
@@ -29,6 +30,8 @@ use Tests\TestCase;
  */
 class RouteConformanceTest extends TestCase
 {
+    use FindsRepositoryFile;
+
     private const SPEC_RELATIVE_PATH = 'docs/api-contracts/openapi.yml';
 
     /**
@@ -305,26 +308,10 @@ class RouteConformanceTest extends TestCase
         return $enums;
     }
 
-    /**
-     * The contract lives in the monorepo, not in this service, so it is found
-     * by walking up from the app root — which works both on the host and in
-     * the test image, where the Makefile mounts it one level above.
-     */
+    /** The contract lives in the monorepo, above this service. */
     private function specPath(): string
     {
-        $directory = base_path();
-
-        for ($depth = 0; $depth < 5; $depth++) {
-            $candidate = $directory.'/'.self::SPEC_RELATIVE_PATH;
-
-            if (is_file($candidate)) {
-                return $candidate;
-            }
-
-            $directory = dirname($directory);
-        }
-
-        $this->fail('Could not find '.self::SPEC_RELATIVE_PATH.' above '.base_path());
+        return $this->repositoryFile(self::SPEC_RELATIVE_PATH);
     }
 
     /** `{organization_id}` and `{organization}` are the same shape. */
