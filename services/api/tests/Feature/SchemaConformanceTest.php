@@ -204,16 +204,39 @@ class SchemaConformanceTest extends TestCase
         $scope = $this->seedAnalysisScope();
 
         $this->expectException(QueryException::class);
-        DB::table('analysis_problems')->insert([
-            'semester_id' => $scope['semester_id'],
-            'bank_problem_id' => null,
-            'manual_match_group_id' => null,
-            'triggered_by_problem_id' => $scope['problem_id'],
-            'analyst_id' => $scope['user_id'],
-            'services' => json_encode(['plagiarism-checker']),
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+        $this->insertScopedAnalysisProblem($scope, bankProblemId: null, matchGroupId: null);
+    }
+
+    /**
+     * Section 5.2: exactly one scope identifier. The scope logic resolves
+     * bank_problem_id and manual_match_group_id in separate branches with no
+     * precedence rule between them, so a row carrying both would describe two
+     * different sets of problems.
+     */
+    public function test_analysis_scope_check_rejects_a_row_with_both_identifiers(): void
+    {
+        $scope = $this->seedAnalysisScope();
+
+        $this->expectException(QueryException::class);
+        $this->insertScopedAnalysisProblem(
+            $scope,
+            bankProblemId: $scope['bank_problem_id'],
+            matchGroupId: '3f8c1d2e-7b4a-4c6d-9e1f-2a5b8c0d3e6f',
+        );
+    }
+
+    public function test_analysis_scope_check_accepts_either_identifier_alone(): void
+    {
+        $scope = $this->seedAnalysisScope();
+
+        $this->insertScopedAnalysisProblem($scope, bankProblemId: $scope['bank_problem_id'], matchGroupId: null);
+        $this->insertScopedAnalysisProblem(
+            $scope,
+            bankProblemId: null,
+            matchGroupId: '3f8c1d2e-7b4a-4c6d-9e1f-2a5b8c0d3e6f',
+        );
+
+        $this->assertSame(2, DB::table('analysis_problems')->count());
     }
 
     public function test_soft_deletes_exist_only_on_problems_and_bank_problems(): void
@@ -417,6 +440,26 @@ class SchemaConformanceTest extends TestCase
             'analyst_id' => $scope['user_id'],
             'services' => json_encode(['plagiarism-checker']),
             'is_latest' => $isLatest,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    /**
+     * Insert with the two scope identifiers spelled out, so a case can set
+     * neither, one or both without the partial unique indexes interfering.
+     *
+     * @param  array<string, int>  $scope
+     */
+    private function insertScopedAnalysisProblem(array $scope, ?int $bankProblemId, ?string $matchGroupId): void
+    {
+        DB::table('analysis_problems')->insert([
+            'semester_id' => $scope['semester_id'],
+            'bank_problem_id' => $bankProblemId,
+            'manual_match_group_id' => $matchGroupId,
+            'triggered_by_problem_id' => $scope['problem_id'],
+            'analyst_id' => $scope['user_id'],
+            'services' => json_encode(['plagiarism-checker']),
             'created_at' => now(),
             'updated_at' => now(),
         ]);

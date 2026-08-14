@@ -144,7 +144,7 @@ All instructors teaching the same Course can see and clone Bank Problems. Publis
 | **System Admin** | Entire platform | Bootstrap and manage Organizations, assign Org Admins, platform configuration. Operates above the Organization scope |
 | **Organization Admin** | Entire Organization | Manage Courses, full cross-section visibility, set Semester policies, manage Problem Bank |
 | **Instructor** | Assigned Sections | Create/edit Problems, trigger analysis, view submissions in own sections, clone from Problem Bank |
-| **Teaching Assistant** | Assigned Sections | View submissions, assist grading. Optional per Section. Cannot create Problems or trigger analysis (unless Instructor permits) |
+| **Teaching Assistant** | Assigned Sections | View submissions and CES execution results, assist grading. Optional per Section. Cannot create Problems, cannot trigger analysis, and cannot read analysis results — *superseded 2026-08-14 (v3 §7): the original "unless Instructor permits" escape hatch is dropped, the denial is absolute* |
 | **Student** | Own Section | View problems (when published), submit code, view own results |
 
 ### 4.2. Isolation Model

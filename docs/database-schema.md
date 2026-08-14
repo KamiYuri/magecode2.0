@@ -608,11 +608,15 @@ DB::statement('
     WHERE is_latest = true AND manual_match_group_id IS NOT NULL
 ');
 
-// CHECK constraint: at least one scope identifier must be set
+// CHECK constraint: exactly one scope identifier must be set (D-47/D-58).
+// The two are alternatives, not a pair: `problems.manual_match_group_id` is
+// only set when a problem has no `bank_problem_id`, and the scope logic below
+// resolves each one in its own branch with no precedence rule between them —
+// a row carrying both would describe two different sets of problems.
 DB::statement('
     ALTER TABLE analysis_problems
     ADD CONSTRAINT chk_analysis_scope
-    CHECK (bank_problem_id IS NOT NULL OR manual_match_group_id IS NOT NULL)
+    CHECK (num_nonnulls(bank_problem_id, manual_match_group_id) = 1)
 ');
 ```
 
@@ -633,7 +637,7 @@ DB::statement('
 | created_at | `timestamps()` | | |
 | updated_at | `timestamps()` | | |
 
-**Scope logic** (for AI agents):
+**Scope logic** (for AI agents) — `chk_analysis_scope` guarantees exactly one branch applies:
 ```
 IF bank_problem_id IS NOT NULL:
     scope = SELECT p.* FROM problems p
@@ -642,13 +646,20 @@ IF bank_problem_id IS NOT NULL:
               AND p.bank_problem_id = :bank_problem_id
               AND p.deleted_at IS NULL
 
-IF manual_match_group_id IS NOT NULL:
+ELSE:  -- manual_match_group_id IS NOT NULL
     scope = SELECT p.* FROM problems p
             JOIN sections s ON p.section_id = s.id
             WHERE s.semester_id = :semester_id
               AND p.manual_match_group_id = :manual_match_group_id
               AND p.deleted_at IS NULL
 ```
+
+**Problems with no scope yet**: a problem written from scratch has neither identifier, so
+neither branch can name it. On trigger, api generates a UUID v4, writes it to
+`problems.manual_match_group_id` in the same transaction as the `analysis_problems` row, and
+scopes to it — a one-problem match group. SIM still compares that problem's submissions
+against each other, and a later `POST /semesters/{id}/match-groups` can widen the group by
+giving other problems the same UUID.
 
 **Re-trigger logic** (for AI agents):
 ```php

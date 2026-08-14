@@ -183,6 +183,11 @@ components:
       in: path
       required: true
       schema: { type: integer, format: int64 }
+    PathUserId:
+      name: user_id
+      in: path
+      required: true
+      schema: { type: integer, format: int64 }
     QueryCursor:
       name: cursor
       in: query
@@ -333,7 +338,7 @@ components:
         first_name: { type: string }
         last_name: { type: string }
         student_id: { type: string, nullable: true }
-        avatar_url: { type: string, nullable: true, description: "Pre-signed MinIO URL" }
+        avatar_url: { type: string, nullable: true, description: "URL of GET /users/{user_id}/avatar. The api streams the object; the MinIO bucket is never reachable from a browser" }
         email_verified_at: { type: string, format: date-time, nullable: true }
         is_first_time_register: { type: boolean }
         created_at: { $ref: '#/components/schemas/Timestamp' }
@@ -345,7 +350,7 @@ components:
         first_name: { type: string }
         last_name: { type: string }
         student_id: { type: string, nullable: true }
-        avatar_url: { type: string, nullable: true }
+        avatar_url: { type: string, nullable: true, description: "URL of GET /users/{user_id}/avatar" }
     UpdateProfileRequest:
       type: object
       properties:
@@ -382,7 +387,7 @@ components:
         name: { type: string }
         description: { type: string, nullable: true }
         email: { type: string, nullable: true }
-        avatar_url: { type: string, nullable: true }
+        avatar_url: { type: string, nullable: true, description: "URL of GET /organizations/{organization_id}/avatar" }
         creator: { $ref: '#/components/schemas/UserSummary' }
         my_role: { type: string, enum: [admin, instructor], nullable: true }
         members_count: { type: integer }
@@ -1268,6 +1273,25 @@ paths:
       responses:
         '204': { $ref: '#/components/responses/NoContent' }
 
+  /users/{user_id}/avatar:
+    get:
+      tags: [Profile]
+      operationId: getUserAvatar
+      summary: "Stream a user's avatar"
+      description: |
+        The target of every `avatar_url` on a User or UserSummary. The api reads
+        the object from MinIO and streams it: pre-signed URLs are signed against
+        the internal endpoint (D-85) and no bucket is browser-reachable.
+        Authenticated; 404 when the user has no avatar.
+      parameters: [{ $ref: '#/components/parameters/PathUserId' }]
+      responses:
+        '200':
+          description: Image stream
+          content:
+            image/*:
+              schema: { type: string, format: binary }
+        '404': { $ref: '#/components/responses/NotFound' }
+
   # ── DASHBOARD ── [NEW: Missing 3]
   /me/sections:
     get:
@@ -1359,6 +1383,19 @@ paths:
                   data: { $ref: '#/components/schemas/Organization' }
 
   /organizations/{organization_id}/avatar:
+    get:
+      tags: [Organizations]
+      operationId: getOrgAvatar
+      summary: "Stream an organization's avatar"
+      description: "The target of `Organization.avatar_url`; streamed by the api for the same reason as the user avatar. 404 when unset."
+      parameters: [{ $ref: '#/components/parameters/PathOrganizationId' }]
+      responses:
+        '200':
+          description: Image stream
+          content:
+            image/*:
+              schema: { type: string, format: binary }
+        '404': { $ref: '#/components/responses/NotFound' }
     post:
       tags: [Organizations]
       operationId: uploadOrgAvatar
@@ -2138,6 +2175,13 @@ paths:
       description: |
         [FIX: Bug 7] If analysis already processing for same scope:
         returns 409 with existing analysis_problem_id. Use /analysis/{id}/cancel first.
+
+        Scope is exactly one of the problem's `bank_problem_id` or its
+        `manual_match_group_id` (schema §5.2). A problem carrying neither gets a
+        fresh `manual_match_group_id` written in the same transaction — a
+        one-problem match group — so `Problem.manual_match_group_id` may change
+        from null as a result of this call. Widen the group afterwards with
+        POST /semesters/{semester_id}/match-groups.
       parameters: [{ $ref: '#/components/parameters/PathProblemId' }]
       requestBody:
         required: true

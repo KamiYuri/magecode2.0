@@ -36,9 +36,9 @@ class RouteConformanceTest extends TestCase
      * than a YAML library, so a formatting change that made it silently see
      * fewer operations would otherwise weaken every assertion in this file.
      */
-    private const EXPECTED_PATHS = 61;
+    private const EXPECTED_PATHS = 62;
 
-    private const EXPECTED_OPERATIONS = 88;
+    private const EXPECTED_OPERATIONS = 90;
 
     /**
      * Declared but not yet routed, by the task that owns them. Strike an entry
@@ -71,8 +71,10 @@ class RouteConformanceTest extends TestCase
             'PUT /profile/password',
             'POST /profile/avatar',
             'DELETE /profile/avatar',
+            'GET /users/{}/avatar',
             'GET /notifications',
             'POST /notifications/mark-read',
+            'GET /organizations/{}/avatar',
             'POST /organizations/{}/avatar',
             'DELETE /organizations/{}/avatar',
         ],

@@ -9,8 +9,10 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
- * The `Organization` schema in openapi.yml. `avatar_url` is a pre-signed MinIO
- * URL and stays null until the storage integration lands (C1).
+ * The `Organization` schema in openapi.yml. `avatar_url` points at
+ * `GET /organizations/{organization_id}/avatar`, which the api streams — the
+ * bucket is never browser-reachable (v3 §7, 2026-08-14) — and stays null
+ * until B12 lands.
  *
  * @mixin Organization
  */

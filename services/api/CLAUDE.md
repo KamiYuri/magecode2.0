@@ -33,7 +33,9 @@ PHP 8.4 (Docker) / 8.3+ (host constraint `^8.3`), Laravel 13, Sanctum bearer tok
   must stay byte-identical to `shared/go/storage/storage.go::SubmissionPath`, which the
   code-executor uses to read the same objects back
 - `config/minio.php` + the `minio` disk in `config/filesystems.php` — pre-signed URLs are signed
-  against the internal endpoint, so they work for the batch workers and not for a browser
+  against the internal endpoint, so they work for the batch workers and not for a browser.
+  Anything a browser must read is streamed by an api route (v3 §7, 2026-08-14); no bucket
+  is ever published, so do not reach for a public MinIO endpoint
 - `app/Models/Problem.php::visibleIn()` — the SQL mirror of `ProblemVisibilityService::isVisible()`;
   change one and change the other, or a listing disagrees with the `is_visible` it reports
 - `app/Http/Controllers/HealthController.php` — readiness probe (503 when DB is down)
