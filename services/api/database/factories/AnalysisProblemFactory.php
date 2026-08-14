@@ -18,8 +18,9 @@ class AnalysisProblemFactory extends Factory
     protected $model = AnalysisProblem::class;
 
     /**
-     * Defaults to a bank-matched scope because chk_analysis_scope requires at
-     * least one of bank_problem_id / manual_match_group_id.
+     * Defaults to a bank-matched scope because chk_analysis_scope requires
+     * exactly one of bank_problem_id / manual_match_group_id — use
+     * manuallyMatched() for the other branch rather than setting both.
      *
      * @return array<string, mixed>
      */

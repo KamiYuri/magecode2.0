@@ -47,11 +47,14 @@ return new class extends Migration
             WHERE is_latest = true AND manual_match_group_id IS NOT NULL
         ');
 
-        // At least one scope identifier must be set (schema doc §5.2).
+        // Exactly one scope identifier must be set (schema doc §5.2). The two
+        // are alternatives: the scope query resolves each in its own branch
+        // with no precedence rule, so a row carrying both would name two
+        // different sets of problems.
         DB::statement('
             ALTER TABLE analysis_problems
             ADD CONSTRAINT chk_analysis_scope
-            CHECK (bank_problem_id IS NOT NULL OR manual_match_group_id IS NOT NULL)
+            CHECK (num_nonnulls(bank_problem_id, manual_match_group_id) = 1)
         ');
     }
 

@@ -461,7 +461,7 @@ All tables are designed from zero for the new domain model. PostgreSQL 16 with P
 
 #### 7.4.1. `analysis_problems`
 
-One analysis batch. Scope is **Semester-level** for SIM (cross-section comparison). Equivalence determined by `bank_problem_id` (auto) or `manual_match_group_id` (manual).
+One analysis batch. Scope is **Semester-level** for SIM (cross-section comparison). Equivalence determined by exactly one of `bank_problem_id` (auto) or `manual_match_group_id` (manual) — `chk_analysis_scope` rejects a row carrying both or neither. A problem with no scope yet gets a one-problem match group generated at trigger time.
 
 | Column | Type | Constraints | Description |
 |---|---|---|---|
