@@ -39,9 +39,9 @@ class RouteConformanceTest extends TestCase
      * than a YAML library, so a formatting change that made it silently see
      * fewer operations would otherwise weaken every assertion in this file.
      */
-    private const EXPECTED_PATHS = 62;
+    private const EXPECTED_PATHS = 63;
 
-    private const EXPECTED_OPERATIONS = 90;
+    private const EXPECTED_OPERATIONS = 91;
 
     /**
      * Declared but not yet routed, by the task that owns them. Strike an entry

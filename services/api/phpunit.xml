@@ -21,7 +21,14 @@
         <env name="APP_ENV" value="testing"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>
         <env name="BCRYPT_ROUNDS" value="4"/>
-        <env name="BROADCAST_CONNECTION" value="null"/>
+        <!-- The reverb driver, with throwaway credentials. Not `null`: that
+             broadcaster skips channel authorisation entirely, so the U-8 auth
+             matrix would pass against nothing. Signing is local, so no Reverb
+             server is involved. -->
+        <env name="BROADCAST_CONNECTION" value="reverb" force="true"/>
+        <env name="REVERB_APP_ID" value="testing" force="true"/>
+        <env name="REVERB_APP_KEY" value="testing-key" force="true"/>
+        <env name="REVERB_APP_SECRET" value="testing-secret" force="true"/>
         <env name="CACHE_STORE" value="array"/>
         <!-- Postgres-only tests (U-6): migrations use partial unique indexes
              and CHECK constraints that SQLite cannot run. Tests talk to

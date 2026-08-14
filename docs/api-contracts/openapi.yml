@@ -1200,6 +1200,37 @@ paths:
       responses:
         '200': { description: Logged out }
 
+  /broadcasting/auth:
+    post:
+      tags: [Auth]
+      operationId: authoriseChannel
+      summary: "Authorise a private WebSocket channel subscription"
+      description: |
+        Laravel Reverb's Pusher-compatible channel authorisation. The client
+        calls this with the channel it wants before subscribing; the rules are
+        the "Who Receives" column of the WebSocket Channels table above.
+        403 when the caller may not hear that channel.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [channel_name, socket_id]
+              properties:
+                channel_name: { type: string, example: "private-submission.1042" }
+                socket_id: { type: string, example: "1234.5678" }
+      responses:
+        '200':
+          description: Signed authorisation for the subscription
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  auth: { type: string }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
   # ── PROFILE ──
   /profile:
     get:

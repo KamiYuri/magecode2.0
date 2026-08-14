@@ -25,6 +25,12 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->configureRateLimiters();
+
+        // Loaded here rather than through withBroadcasting(), which also
+        // registers the auth endpoint for both GET and POST. Pusher clients
+        // POST, an undeclared GET fails route conformance, and the endpoint
+        // belongs under /api/v1 anyway (U-3) — so routes/api.php declares it.
+        require base_path('routes/channels.php');
     }
 
     /**

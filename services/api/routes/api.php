@@ -16,6 +16,8 @@ use App\Http\Controllers\SectionMemberController;
 use App\Http\Controllers\SemesterController;
 use App\Http\Controllers\SubmissionController;
 use App\Http\Controllers\TestCaseController;
+use Illuminate\Broadcasting\BroadcastController;
+use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -51,6 +53,13 @@ Route::prefix('v1')->group(function (): void {
     // rate-limit table; the tighter per-operation limiters (submissions,
     // analysis, uploads) are attached by the tasks that add those routes.
     Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
+        // Channel authorisation for Reverb (U-8). Declared here rather than by
+        // Broadcast::routes(), which answers GET as well — Pusher clients POST,
+        // and an undeclared GET is a route the contract does not know about.
+        Route::post('broadcasting/auth', [BroadcastController::class, 'authenticate'])
+            ->withoutMiddleware([PreventRequestForgery::class])
+            ->name('broadcasting.auth');
+
         // Route parameters are named for implicit binding ({organization}),
         // while openapi.yml spells them {organization_id} — B11's conformance
         // test compares paths with the placeholder names normalised away.
