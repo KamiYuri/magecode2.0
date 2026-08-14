@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"sync"
 	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -74,6 +75,34 @@ func (c *consumer) consumeSession(ctx context.Context, queue, consumerTag string
 		return fmt.Errorf("starting consume: %w", err)
 	}
 
+	// One channel, one prefetch window, Concurrency handlers draining it
+	// (D-75/D-76). Settling is serialised by sendMu: a publish is several
+	// AMQP frames and amqp091-go takes the connection's send lock per frame,
+	// so two goroutines republishing at once would interleave frames and
+	// corrupt the stream. The handler itself — the slow part — runs outside
+	// that lock.
+	var sendMu sync.Mutex
+	var workers sync.WaitGroup
+	jobs := make(chan amqp.Delivery)
+
+	for range c.cfg.Concurrency {
+		workers.Add(1)
+		go func() {
+			defer workers.Done()
+			for delivery := range jobs {
+				c.handleDelivery(ctx, ch, &sendMu, queue, delivery, handler)
+			}
+		}()
+	}
+	// Runs before the deferred ch.Close() above: every in-flight handler
+	// finishes and settles its own message before the channel goes away
+	// (D-73). Deliveries already buffered but never dispatched stay unacked
+	// and the broker requeues them.
+	defer func() {
+		close(jobs)
+		workers.Wait()
+	}()
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -85,7 +114,15 @@ func (c *consumer) consumeSession(ctx context.Context, queue, consumerTag string
 			if !open {
 				return nil // channel died; caller reconnects
 			}
-			c.handleDelivery(ctx, ch, queue, delivery, handler)
+			select {
+			case jobs <- delivery:
+			case <-ctx.Done():
+				// Every worker is busy and shutdown began. Leaving the
+				// message unacked hands it back to the broker, which is
+				// better than blocking the drain on a full pool.
+				_ = ch.Cancel(consumerTag, false)
+				return nil
+			}
 		}
 	}
 }
@@ -93,7 +130,18 @@ func (c *consumer) consumeSession(ctx context.Context, queue, consumerTag string
 // handleDelivery runs the handler and settles the message: ack on success,
 // republish to the retry queue with per-message TTL on transient failure,
 // park on the DLQ when permanent or out of retry budget (D-79e).
-func (c *consumer) handleDelivery(ctx context.Context, ch *amqp.Channel, queue string, msg amqp.Delivery, handler Handler) {
+//
+// sendMu guards everything that writes to the channel. The handler runs
+// without it, so concurrent deliveries overlap where the time is actually
+// spent; only the settle is serialised.
+func (c *consumer) handleDelivery(
+	ctx context.Context,
+	ch *amqp.Channel,
+	sendMu *sync.Mutex,
+	queue string,
+	msg amqp.Delivery,
+	handler Handler,
+) {
 	retryCount := headerInt(msg.Headers, headerRetryCount)
 	traceID := headerString(msg.Headers, headerTraceID)
 
@@ -103,6 +151,10 @@ func (c *consumer) handleDelivery(ctx context.Context, ch *amqp.Channel, queue s
 		TraceID:    traceID,
 		RetryCount: retryCount,
 	})
+
+	sendMu.Lock()
+	defer sendMu.Unlock()
+
 	if handlerErr == nil {
 		if err := msg.Ack(false); err != nil {
 			c.cfg.Logger.Error("acking delivery", "error", err.Error(),

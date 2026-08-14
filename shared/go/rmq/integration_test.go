@@ -289,3 +289,142 @@ func TestGracefulDrainFinishesInFlightHandler(t *testing.T) {
 		t.Errorf("main queue depth = %d, want 0 (message must be acked, not redelivered)", depth)
 	}
 }
+
+// TestConcurrentHandlersRunInParallel pins D-75/D-76: one channel holds the
+// prefetch window and Concurrency handlers drain it. Sequential processing
+// would take len(bodies) * handlerDelay; parallel takes roughly one delay.
+func TestConcurrentHandlersRunInParallel(t *testing.T) {
+	url := brokerURL(t)
+	queue := testQueue(t, url)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	const jobs = 5
+	const handlerDelay = 300 * time.Millisecond
+
+	pub, err := rmq.NewPublisher(ctx, rmq.Config{URL: url})
+	if err != nil {
+		t.Fatalf("NewPublisher: %v", err)
+	}
+	defer pub.Close()
+	for i := range jobs {
+		if err := pub.Publish(ctx, queue, fmt.Appendf(nil, "job-%d", i), "trace-parallel"); err != nil {
+			t.Fatalf("Publish: %v", err)
+		}
+	}
+
+	con, err := rmq.NewConsumer(ctx, rmq.Config{
+		URL:           url,
+		PrefetchCount: jobs,
+		Concurrency:   jobs,
+	})
+	if err != nil {
+		t.Fatalf("NewConsumer: %v", err)
+	}
+	defer con.Close()
+
+	var inFlight, peak atomic.Int64
+	done := make(chan struct{}, jobs)
+	go func() {
+		_ = con.Consume(ctx, queue, func(_ context.Context, _ rmq.Delivery) error {
+			current := inFlight.Add(1)
+			for {
+				old := peak.Load()
+				if current <= old || peak.CompareAndSwap(old, current) {
+					break
+				}
+			}
+			time.Sleep(handlerDelay)
+			inFlight.Add(-1)
+			done <- struct{}{}
+			return nil
+		})
+	}()
+
+	start := time.Now()
+	for range jobs {
+		select {
+		case <-done:
+		case <-time.After(waitTimeout):
+			t.Fatal("timed out waiting for handlers")
+		}
+	}
+	elapsed := time.Since(start)
+
+	if peak.Load() < 2 {
+		t.Errorf("peak concurrent handlers = %d, want at least 2 (handlers ran sequentially)", peak.Load())
+	}
+	if sequential := jobs * handlerDelay; elapsed >= sequential {
+		t.Errorf("elapsed %v >= sequential %v; concurrency had no effect", elapsed, sequential)
+	}
+}
+
+// TestGracefulDrainFinishesEveryInFlightHandler is the drain guarantee under
+// concurrency: cancellation must not abandon the other running handlers, and
+// every one of them must settle its own message.
+func TestGracefulDrainFinishesEveryInFlightHandler(t *testing.T) {
+	url := brokerURL(t)
+	queue := testQueue(t, url)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	const jobs = 3
+
+	pub, err := rmq.NewPublisher(ctx, rmq.Config{URL: url})
+	if err != nil {
+		t.Fatalf("NewPublisher: %v", err)
+	}
+	defer pub.Close()
+	for i := range jobs {
+		if err := pub.Publish(ctx, queue, fmt.Appendf(nil, "job-%d", i), "trace-drain-many"); err != nil {
+			t.Fatalf("Publish: %v", err)
+		}
+	}
+
+	con, err := rmq.NewConsumer(ctx, rmq.Config{
+		URL:           url,
+		PrefetchCount: jobs,
+		Concurrency:   jobs,
+	})
+	if err != nil {
+		t.Fatalf("NewConsumer: %v", err)
+	}
+	defer con.Close()
+
+	var started, finished atomic.Int64
+	allStarted := make(chan struct{})
+	consumeDone := make(chan error, 1)
+	go func() {
+		consumeDone <- con.Consume(ctx, queue, func(_ context.Context, _ rmq.Delivery) error {
+			if started.Add(1) == jobs {
+				close(allStarted)
+			}
+			time.Sleep(300 * time.Millisecond) // outlives the cancellation below
+			finished.Add(1)
+			return nil
+		})
+	}()
+
+	select {
+	case <-allStarted:
+	case <-time.After(waitTimeout):
+		t.Fatalf("only %d of %d handlers started", started.Load(), jobs)
+	}
+	cancel()
+
+	select {
+	case err := <-consumeDone:
+		if err != nil {
+			t.Fatalf("Consume returned error: %v", err)
+		}
+	case <-time.After(waitTimeout):
+		t.Fatal("Consume did not return after context cancellation")
+	}
+
+	if got := finished.Load(); got != jobs {
+		t.Errorf("finished handlers = %d, want %d", got, jobs)
+	}
+	if depth := queueDepth(t, url, queue); depth != 0 {
+		t.Errorf("main queue depth = %d, want 0 (all messages must be acked)", depth)
+	}
+}

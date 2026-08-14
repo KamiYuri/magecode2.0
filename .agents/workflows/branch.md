@@ -36,6 +36,10 @@ main                          ← Production-ready
 ### Service Prefixes
 - `api/` — Laravel API service (`services/api/`)
 - `web/` — Frontend web app (`services/web/`)
+- `ces/` — Code executor (`services/code-executor/`)
+- `sim/` — Plagiarism checker (`services/plagiarism-checker/`)
+- `aid/` — AI detector (`services/ai-detector/`)
+- `vul/` — Vulnerability scanner (`services/vuln-scanner/`)
 - `ui/` — UI/Design work
 - `infra/` — Infrastructure / Docker / deploy configs
 - `docs/` — Documentation only changes
