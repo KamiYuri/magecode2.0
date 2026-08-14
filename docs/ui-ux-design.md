@@ -144,7 +144,10 @@ language, time, `is_outdated` badge `Bộ test đã thay đổi` per D-41).
 Submit → row appears instantly in history with pending strip → cells fill via
 `private-submission.{id}` events → final toast `Đã chấm xong: 7/10 test`. No page reload at
 any point. When `max_submissions` is reached the submit button disables with reason text, and
-when `lock_time` passes the editor becomes read-only with banner `Đã hết hạn nộp bài`.
+when `lock_time` passes the editor becomes read-only with banner `Đã hết hạn nộp bài`. The
+button also disables while the student's previous submission is still `in_queue`/`processing`
+(`SUBMISSION_PROCESSING`, v3 §7) — the pending row in the history already shows why, so the
+reason text points at it: `Đang chấm bài trước`.
 
 ### 4.3. Section workspace — staff (`/sections/:id`)
 

@@ -40,7 +40,7 @@ class StoreSubmissionRequest extends FormRequest
     {
         return function (string $attribute, mixed $value, Closure $fail): void {
             if (is_string($value) && strlen($value) > SubmissionStorageService::MAX_FILE_BYTES) {
-                $fail("The :attribute may not be greater than ".SubmissionStorageService::MAX_FILE_BYTES.' bytes.');
+                $fail('The :attribute may not be greater than '.SubmissionStorageService::MAX_FILE_BYTES.' bytes.');
             }
         };
     }
