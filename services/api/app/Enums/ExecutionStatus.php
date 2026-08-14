@@ -14,4 +14,16 @@ enum ExecutionStatus: string
     case Error = 'error';
     case Timeout = 'timeout';
     case LanguageNotSupported = 'language_not_supported';
+
+    /** CES has not reached a verdict yet — the states C2's gate looks for. */
+    public function isUnfinished(): bool
+    {
+        return $this === self::InQueue || $this === self::Processing;
+    }
+
+    /** @return list<string> */
+    public static function unfinishedValues(): array
+    {
+        return [self::InQueue->value, self::Processing->value];
+    }
 }

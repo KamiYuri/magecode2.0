@@ -6,6 +6,7 @@ namespace App\Policies;
 
 use App\Enums\SectionRole;
 use App\Models\Problem;
+use App\Models\Section;
 use App\Models\Submission;
 use App\Models\User;
 use App\Services\MembershipService;
@@ -35,5 +36,27 @@ class SubmissionPolicy
     public function create(User $user, Problem $problem): bool
     {
         return $this->memberships->sectionRole($user, $problem->section_id) === SectionRole::Student;
+    }
+
+    /**
+     * Anyone in the section may ask for the listing; a student's own work is
+     * all they get back. Narrowing the rows is the query's job — refusing the
+     * request outright would leave a student with no way to see their history.
+     */
+    public function viewAny(User $user, Problem $problem): bool
+    {
+        return $this->memberships->isSectionMember($user, $problem->section_id)
+            || $this->memberships->administersSection($user, $problem->section);
+    }
+
+    /**
+     * The section-wide listing is a staff dashboard (openapi
+     * `listSectionSubmissions`): it spans every student, so unlike the
+     * per-problem listing there is no version of it a student may hold.
+     */
+    public function viewSection(User $user, Section $section): bool
+    {
+        return $this->memberships->isSectionStaff($user, $section)
+            || $this->memberships->administersSection($user, $section);
     }
 }

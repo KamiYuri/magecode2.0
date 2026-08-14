@@ -89,6 +89,20 @@ class SubmissionStorageService
         $this->disk()->delete($path);
     }
 
+    /**
+     * The stored source, or null when the object is gone.
+     *
+     * A missing object is not an error the reader can act on: the row is the
+     * record of the submission and the bytes are storage, so C2 renders
+     * `source_code: null` rather than turning a lost object into a 500.
+     */
+    public function read(string $path): ?string
+    {
+        $disk = $this->disk();
+
+        return $disk->exists($path) ? $disk->get($path) : null;
+    }
+
     /** @throws SubmissionFileException */
     private function store(
         int $problemId,

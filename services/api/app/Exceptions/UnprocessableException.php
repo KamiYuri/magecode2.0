@@ -48,6 +48,47 @@ final class UnprocessableException extends ApiException
         );
     }
 
+    /**
+     * The problem is closed to work — either not open yet or past its lock.
+     * One code covers both because the contract offers one, and a student who
+     * cannot submit does not benefit from learning which end of the window
+     * they missed.
+     */
+    public static function deadlinePassed(): self
+    {
+        return new self(
+            'DEADLINE_PASSED',
+            'This problem is not open for submissions.'
+        );
+    }
+
+    /** D-36: `max_submissions` is spent. Rows count, not verdicts. */
+    public static function maxSubmissions(int $limit): self
+    {
+        return new self(
+            'MAX_SUBMISSIONS',
+            "You have used all {$limit} submissions for this problem."
+        );
+    }
+
+    /** The language is not among the problem's allowed set. */
+    public static function languageNotAllowed(): self
+    {
+        return new self(
+            'LANGUAGE_NOT_ALLOWED',
+            'This problem does not accept submissions in that language.'
+        );
+    }
+
+    /** v3 §7: one unfinished submission per student per problem. */
+    public static function submissionProcessing(): self
+    {
+        return new self(
+            'SUBMISSION_PROCESSING',
+            'Your previous submission for this problem is still being graded.'
+        );
+    }
+
     /** The semester forbids per-problem overrides and the caller is not an Org Admin. */
     public static function policyOverrideDenied(): self
     {

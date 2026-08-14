@@ -19,6 +19,12 @@ return Application::configure(basePath: dirname(__DIR__))
         // guests to a `login` route, which does not exist here, so the
         // redirect threw before the 401 could be rendered.
         $middleware->redirectGuestsTo(fn (): ?string => null);
+
+        // Source code is bytes, not a form field. Trimming it silently drops
+        // the trailing newline every editor writes and any leading blank line,
+        // so the object stored would differ from what the student submitted —
+        // and SIM compares those bytes across sections.
+        $middleware->trimStrings(except: ['source_code']);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

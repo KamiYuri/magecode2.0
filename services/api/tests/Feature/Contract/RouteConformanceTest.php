@@ -78,13 +78,6 @@ class RouteConformanceTest extends TestCase
             'POST /organizations/{}/avatar',
             'DELETE /organizations/{}/avatar',
         ],
-        'C2 submissions' => [
-            'GET /problems/{}/submissions',
-            'POST /problems/{}/submissions',
-            'POST /problems/{}/submissions/upload',
-            'GET /submissions/{}',
-            'GET /sections/{}/submissions',
-        ],
         'D1-D8 analysis' => [
             'POST /problems/{}/analysis',
             'GET /problems/{}/analysis',
