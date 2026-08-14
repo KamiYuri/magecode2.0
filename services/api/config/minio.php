@@ -6,7 +6,7 @@ return [
 
     /*
      * The disk every storage service writes through. Named separately from
-     * `filesystems.default` so a future public/avatar disk can coexist.
+     * `filesystems.default` so a second disk could coexist if one is ever needed.
      */
     'disk' => env('MINIO_DISK', 'minio'),
 
@@ -17,8 +17,9 @@ return [
      *
      * URLs are signed against the internal endpoint. SigV4 covers the Host
      * header, so they are only fetchable from inside the compose network — which
-     * is what SIM/AID/VUL need (D-80/D-85). A browser-facing download surface
-     * needs a public endpoint and its own signature.
+     * is what SIM/AID/VUL need (D-80/D-85). That is deliberate and final:
+     * anything a browser must read is streamed by an api route instead, so no
+     * bucket is ever published (v3 §7, 2026-08-14).
      */
     'presigned_url_ttl' => (int) env('MINIO_PRESIGNED_URL_TTL', 21600),
 
