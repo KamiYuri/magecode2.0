@@ -6,9 +6,12 @@
 >
 > **Status values**: `todo` · `wip` · `review` · `done` · `blocked` (+ one-line reason in Notes)
 
-**Current milestone: M2** — exit: E2E submit → per-test-case rows → WebSocket event. (M0 passed
-2026-08-12, M1 passed 2026-08-13; see gate table. M1's P2 leftovers — B9 tags, B12 profile +
-notifications — and B10, which M5 owns, stay open and can land alongside M2.)
+**Current milestone: M3** — exit: E2E analysis (E9). Plan D work has started while **M2's gate
+stays unclaimed**: C1–C7 are done but C8 cannot run on this host (cgroup v2 vs Judge0's cgroup
+v1, D-90), so the submit → grade → WebSocket path is proven only as far as the code, not as far
+as a real Judge0. Close M2 by enabling cgroup v1 and running `scripts/e2e-submission.sh`.
+(M0 passed 2026-08-12, M1 passed 2026-08-13; see gate table. M1's P2 leftovers — B9 tags, B12
+profile + notifications — and B10, which M5 owns, stay open.)
 
 ## M0 — Plan A: Shared Go Packages & Scaffolds
 
@@ -56,7 +59,7 @@ notifications — and B10, which M5 owns, stay open and can land alongside M2.)
 
 | Task | Prio | Status | Ref | Notes |
 |---|---|---|---|---|
-| D1 trigger + scope + is_latest | P0 | todo | — | Scope is XOR; a problem with neither identifier gets a one-problem `manual_match_group_id` generated in the trigger transaction (v3 §7) |
+| D1 trigger + scope + is_latest | P0 | wip | `api/feat/analysis-trigger` | Scope is XOR; a problem with neither identifier gets a one-problem `manual_match_group_id` generated in the trigger transaction (v3 §7) |
 | D2 sim job building | P0 | todo | — | — |
 | D3 aid/vul job publishing | P0 | todo | — | — |
 | D4 sim result handler | P0 | todo | — | — |
