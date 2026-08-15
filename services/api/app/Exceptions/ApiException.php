@@ -18,8 +18,17 @@ use RuntimeException;
  */
 abstract class ApiException extends RuntimeException
 {
-    protected function __construct(private readonly string $errorCode, string $message)
-    {
+    /**
+     * @param  array<string, mixed>  $context  extra fields the contract asks
+     *                                         the body to carry, such as the
+     *                                         id a 409 tells the caller to
+     *                                         look at. Empty for most codes.
+     */
+    protected function __construct(
+        private readonly string $errorCode,
+        string $message,
+        private readonly array $context = [],
+    ) {
         parent::__construct($message);
     }
 
@@ -28,7 +37,7 @@ abstract class ApiException extends RuntimeException
     public function render(Request $request): JsonResponse
     {
         return response()->json(
-            ['message' => $this->getMessage(), 'code' => $this->errorCode],
+            ['message' => $this->getMessage(), 'code' => $this->errorCode] + $this->context,
             $this->status()
         );
     }

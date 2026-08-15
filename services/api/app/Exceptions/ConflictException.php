@@ -34,6 +34,20 @@ final class ConflictException extends ApiException
         return new self('LAST_ADMIN', 'The organization must keep at least one admin.');
     }
 
+    /**
+     * A batch is already running for this scope. The id travels in the body
+     * because the contract tells the caller to cancel *that* batch before
+     * retrying, and they cannot without knowing which one.
+     */
+    public static function analysisInProgress(int $analysisProblemId): self
+    {
+        return new self(
+            'ANALYSIS_IN_PROGRESS',
+            'An analysis is already running for this group of problems.',
+            ['analysis_problem_id' => $analysisProblemId],
+        );
+    }
+
     protected function status(): int
     {
         return JsonResponse::HTTP_CONFLICT;

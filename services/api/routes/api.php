@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\Admin;
+use App\Http\Controllers\AnalysisController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Auth\EmailVerificationController;
 use App\Http\Controllers\Auth\PasswordResetController;
@@ -151,6 +152,11 @@ Route::prefix('v1')->group(function (): void {
             ->name('sections.submissions.index');
         Route::get('submissions/{submission}', [SubmissionController::class, 'show'])
             ->name('submissions.show');
+
+        // Analysis costs real compute, so it takes the tighter limiter (U-3).
+        Route::post('problems/{problem}/analysis', [AnalysisController::class, 'store'])
+            ->middleware('throttle:analysis')
+            ->name('problems.analysis.store');
     });
 });
 

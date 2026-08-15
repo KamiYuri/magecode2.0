@@ -847,6 +847,13 @@ components:
             type: string
             enum: [plagiarism-checker, ai-detector, vuln-scanner]
           minItems: 1
+        force:
+          type: boolean
+          default: false
+          description: |
+            Run again even when a completed batch already covers this scope and
+            this set of services (D-53). Without it such a call answers 200 with
+            the existing batch instead of spending the compute twice.
     AnalysisSubmission:
       type: object
       properties:
@@ -2213,6 +2220,12 @@ paths:
         one-problem match group — so `Problem.manual_match_group_id` may change
         from null as a result of this call. Widen the group afterwards with
         POST /semesters/{semester_id}/match-groups.
+
+        A scope whose latest batch is already `completed` for the same set of
+        services answers **200** with that batch rather than running again — a
+        batch covers every equivalent problem in the semester (schema §5.1), so
+        a second instructor triggering it would spend the same compute on the
+        same data. Send `force: true` to run anyway (D-53).
       parameters: [{ $ref: '#/components/parameters/PathProblemId' }]
       requestBody:
         required: true
@@ -2220,7 +2233,16 @@ paths:
           application/json:
             schema: { $ref: '#/components/schemas/TriggerAnalysisRequest' }
       responses:
+        '200':
+          description: "Results already exist for this scope; the existing batch is returned unchanged"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/AnalysisProblem' }
         '201':
+          description: "A new batch was created"
           content:
             application/json:
               schema:
@@ -2229,7 +2251,7 @@ paths:
                   data: { $ref: '#/components/schemas/AnalysisProblem' }
         '409':
           description: "ANALYSIS_IN_PROGRESS — includes existing analysis_problem_id"
-        '422': { description: No submissions to analyze }
+        '422': { description: "NO_SUBMISSIONS — nothing in scope to analyse" }
     get:
       tags: [Analysis]
       operationId: getLatestAnalysis
