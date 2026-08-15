@@ -89,6 +89,15 @@ final class UnprocessableException extends ApiException
         );
     }
 
+    /** Nothing in scope to analyse — no student has submitted yet. */
+    public static function noSubmissions(): self
+    {
+        return new self(
+            'NO_SUBMISSIONS',
+            'No submissions exist for this group of problems yet.'
+        );
+    }
+
     /** The semester forbids per-problem overrides and the caller is not an Org Admin. */
     public static function policyOverrideDenied(): self
     {

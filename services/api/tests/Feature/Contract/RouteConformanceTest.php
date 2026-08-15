@@ -82,7 +82,6 @@ class RouteConformanceTest extends TestCase
             'DELETE /organizations/{}/avatar',
         ],
         'D1-D8 analysis' => [
-            'POST /problems/{}/analysis',
             'GET /problems/{}/analysis',
             'GET /problems/{}/analysis/history',
             'POST /analysis/{}/cancel',
