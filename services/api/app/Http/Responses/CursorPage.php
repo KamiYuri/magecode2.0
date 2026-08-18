@@ -44,8 +44,23 @@ final class CursorPage
      */
     public static function json(CursorPaginator $page, string $resource): JsonResponse
     {
+        return self::mapped($page, fn (Model $model): JsonResource => new $resource($model));
+    }
+
+    /**
+     * The same envelope for a resource the caller has to build itself —
+     * anything whose constructor takes more than the model, such as the
+     * analysis results, which need the viewer and the batch (D8).
+     *
+     * @template TModel of Model
+     *
+     * @param  CursorPaginator<int, TModel>  $page
+     * @param  callable(TModel): mixed  $transform
+     */
+    public static function mapped(CursorPaginator $page, callable $transform): JsonResponse
+    {
         return response()->json([
-            'data' => $resource::collection($page->items()),
+            'data' => array_map($transform, $page->items()),
             'meta' => [
                 'next_cursor' => $page->nextCursor()?->encode(),
                 'prev_cursor' => $page->previousCursor()?->encode(),

@@ -6,11 +6,12 @@ Single writer to PostgreSQL in the batch path (D-80) and the only service expose
 through Traefik (D-86).
 
 ## Status
-Through D7: everything of M1 (auth, RBAC, entity CRUD, roster, problems), the submission
+Through D8 — **Plan D complete**: everything of M1 (auth, RBAC, entity CRUD, roster, problems), the submission
 endpoints and their MinIO storage, the AMQP publisher and the execution-result consumer, and
 Plan D's trigger, SIM/AID/VUL job publishing, `result-analysis` ingestion, batch completion with
-its Reverb frames, and the D-82 timeout sweeper.
-Next: D8 analysis read APIs (privacy-tagged, gates M3). Open from M1: B9 tags,
+its Reverb frames, the D-82 timeout sweeper and the two-tier analysis read APIs.
+Next: Plan E (the workers) is what M3's gate now waits on. Open from M1: B9 tags, B10 problem
+bank, B12 profile + notifications. Open from M1: B9 tags,
 B10 problem bank, B12 profile + notifications.
 
 **Adding an endpoint?** `tests/Feature/Contract/RouteConformanceTest.php` fails until the
@@ -49,6 +50,11 @@ WebSockets, Pint + Larastan (level 6).
   is ever published, so do not reach for a public MinIO endpoint
 - `app/Models/Problem.php::visibleIn()` — the SQL mirror of `ProblemVisibilityService::isVisible()`;
   change one and change the other, or a listing disagrees with the `is_visible` it reports
+- `app/Services/Analysis/AnalysisVisibilityService.php` — **the one place D-05/D-06 live**. Every
+  surface that can emit a student's source asks `mayReadSourceOf()`; resources and controllers
+  never decide for themselves. An instructor sees a side's code only for a section they teach, an
+  Org Admin sees every side, and `?include=source_code` selects a field rather than a permission
+  (v3 §7, 2026-08-18). `SimilarityVisibilityTest` is its specification — extend both together
 - `app/Services/Analysis/AnalysisCompletionService.php` — the only writer of
   `analysis_problems.status` after creation. `close()` is conditional on `processing`, which is
   what keeps `analysis.completed` firing once; D8's cancel must go through it too. Completion is

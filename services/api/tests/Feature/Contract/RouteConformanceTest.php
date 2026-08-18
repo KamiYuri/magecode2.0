@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Contract;
 
+use App\Http\Requests\Analysis\ListAnalysisSubmissionsRequest;
 use App\Http\Requests\Problem\ListProblemsRequest;
 use App\Http\Requests\Problem\ShowProblemRequest;
 use Illuminate\Support\Facades\Route;
@@ -81,14 +82,6 @@ class RouteConformanceTest extends TestCase
             'POST /organizations/{}/avatar',
             'DELETE /organizations/{}/avatar',
         ],
-        'D1-D8 analysis' => [
-            'GET /analysis/{}/submissions',
-            'GET /analysis/{}/similarity',
-            'GET /analysis/{}/similarity/{}',
-            'GET /analysis/{}/ai-detection',
-            'GET /analysis/{}/vulnerabilities',
-            'GET /semesters/{}/analysis-overview',
-        ],
         'F4 dashboards and reference reads' => [
             'GET /me/sections',
             'GET /programming-languages',
@@ -154,8 +147,8 @@ class RouteConformanceTest extends TestCase
     /**
      * `?include=` is enumerated per operation rather than shared (D-91), so
      * the allowlist in each request class is a copy of the contract's enum and
-     * has to be checked against it. Only three operations declare one; the
-     * third belongs to D8 and has no request class yet.
+     * has to be checked against it. Three operations declare one, and all
+     * three now have a request class.
      */
     public function test_the_include_allowlists_match_the_contract(): void
     {
@@ -164,6 +157,7 @@ class RouteConformanceTest extends TestCase
         $this->assertCount(3, $declared, 'The number of operations declaring `include` changed.');
         $this->assertContains(ListProblemsRequest::INCLUDABLE, $declared);
         $this->assertContains(ShowProblemRequest::INCLUDABLE, $declared);
+        $this->assertContains(ListAnalysisSubmissionsRequest::INCLUDABLE, $declared);
     }
 
     public function test_every_api_route_lives_under_the_version_prefix(): void
