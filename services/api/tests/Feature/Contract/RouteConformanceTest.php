@@ -82,17 +82,12 @@ class RouteConformanceTest extends TestCase
             'DELETE /organizations/{}/avatar',
         ],
         'D1-D8 analysis' => [
-            'GET /problems/{}/analysis',
-            'GET /problems/{}/analysis/history',
-            'POST /analysis/{}/cancel',
             'GET /analysis/{}/submissions',
             'GET /analysis/{}/similarity',
             'GET /analysis/{}/similarity/{}',
             'GET /analysis/{}/ai-detection',
             'GET /analysis/{}/vulnerabilities',
             'GET /semesters/{}/analysis-overview',
-            'GET /semesters/{}/match-groups',
-            'POST /semesters/{}/match-groups',
         ],
         'F4 dashboards and reference reads' => [
             'GET /me/sections',

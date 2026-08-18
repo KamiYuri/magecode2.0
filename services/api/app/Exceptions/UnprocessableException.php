@@ -107,6 +107,46 @@ final class UnprocessableException extends ApiException
         );
     }
 
+    /** Cancelling something that already ended is not a state change. */
+    public static function analysisNotProcessing(): self
+    {
+        return new self(
+            'ANALYSIS_NOT_PROCESSING',
+            'This analysis has already finished; there is nothing to cancel.'
+        );
+    }
+
+    /** D-58: a manual match group spans one semester and nothing else. */
+    public static function matchGroupOutsideSemester(): self
+    {
+        return new self(
+            'MATCH_GROUP_OUTSIDE_SEMESTER',
+            'Every problem in a match group must belong to the same semester.'
+        );
+    }
+
+    /**
+     * `chk_analysis_scope` is XOR: a problem cloned from the bank is already
+     * grouped by `bank_problem_id`, and a second identifier would describe two
+     * different sets of problems (v3 §7, 2026-08-14).
+     */
+    public static function matchGroupBankProblem(): self
+    {
+        return new self(
+            'MATCH_GROUP_BANK_PROBLEM',
+            'A problem cloned from the bank is already matched by its bank entry and cannot be grouped manually.'
+        );
+    }
+
+    /** Regrouping mid-run would move the ground under a batch already reading it. */
+    public static function matchGroupAnalysisInProgress(): self
+    {
+        return new self(
+            'MATCH_GROUP_ANALYSIS_IN_PROGRESS',
+            'One of these problems is being analysed right now; wait for it to finish or cancel it first.'
+        );
+    }
+
     protected function status(): int
     {
         return JsonResponse::HTTP_UNPROCESSABLE_ENTITY;
