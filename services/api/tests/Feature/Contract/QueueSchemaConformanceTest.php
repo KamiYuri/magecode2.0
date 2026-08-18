@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Contract;
 
+use App\Enums\DolosLanguage;
 use App\Messaging\Jobs\CodeExecutorJob;
+use App\Messaging\Jobs\PlagiarismCheckerJob;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 use JsonSchema\Constraints\Constraint;
@@ -22,6 +24,8 @@ class QueueSchemaConformanceTest extends TestCase
     use FindsRepositoryFile;
 
     private const CODE_EXECUTOR_SCHEMA = 'shared/schemas/job.code-executor.v1.schema.json';
+
+    private const PLAGIARISM_CHECKER_SCHEMA = 'shared/schemas/job.plagiarism-checker.v1.schema.json';
 
     public function test_a_code_executor_job_matches_the_published_schema(): void
     {
@@ -76,6 +80,74 @@ class QueueSchemaConformanceTest extends TestCase
 
         $this->assertSame(['submission_id', 'trace_id', 'timestamp', 'version'], array_keys($payload));
         $this->assertSame('1.0', $payload['version']);
+    }
+
+    public function test_a_plagiarism_checker_job_matches_the_published_schema(): void
+    {
+        $this->assertValidates($this->simJob()->toArray(), self::PLAGIARISM_CHECKER_SCHEMA);
+    }
+
+    public function test_a_plagiarism_checker_job_with_an_unexpected_key_is_rejected(): void
+    {
+        $payload = $this->simJob()->toArray();
+        $payload['section_id'] = 3;
+
+        $this->assertViolates($payload, self::PLAGIARISM_CHECKER_SCHEMA);
+    }
+
+    /**
+     * `minItems: 2` is the schema half of the rule `SimJobPlan` enforces: a
+     * language with one submission is never published. Proving the validator
+     * refuses a single-submission message is what makes the plan's silence
+     * about it safe.
+     */
+    public function test_a_group_of_one_submission_is_rejected(): void
+    {
+        $payload = $this->simJob()->toArray();
+        $payload['submissions'] = [$payload['submissions'][0]];
+
+        $this->assertViolates($payload, self::PLAGIARISM_CHECKER_SCHEMA);
+    }
+
+    /** The enum is closed; a language Dolos cannot parse must never reach a message. */
+    public function test_a_language_outside_the_enum_is_rejected(): void
+    {
+        $payload = $this->simJob()->toArray();
+        $payload['language'] = 'javascript';
+
+        $this->assertViolates($payload, self::PLAGIARISM_CHECKER_SCHEMA);
+    }
+
+    public function test_the_plagiarism_payload_carries_only_the_documented_keys(): void
+    {
+        $payload = $this->simJob()->toArray();
+
+        $this->assertSame([
+            'analysis_problem_id', 'language', 'language_group_index', 'language_group_total',
+            'submissions', 'trace_id', 'timestamp', 'version',
+        ], array_keys($payload));
+
+        $this->assertSame(
+            ['submission_id', 'analysis_submission_id', 'file_url'],
+            array_keys($payload['submissions'][0]),
+        );
+        $this->assertSame('1.0', $payload['version']);
+    }
+
+    private function simJob(): PlagiarismCheckerJob
+    {
+        return new PlagiarismCheckerJob(
+            analysisProblemId: 45,
+            language: DolosLanguage::Python,
+            languageGroupIndex: 0,
+            languageGroupTotal: 2,
+            submissions: [
+                ['submission_id' => 101, 'analysis_submission_id' => 501, 'file_url' => 'https://minio.test/a?sig=1'],
+                ['submission_id' => 102, 'analysis_submission_id' => 502, 'file_url' => 'https://minio.test/b?sig=2'],
+            ],
+            traceId: (string) Str::uuid(),
+            publishedAt: Carbon::parse('2026-08-15T14:00:00Z'),
+        );
     }
 
     /** @param array<string, mixed> $payload */
