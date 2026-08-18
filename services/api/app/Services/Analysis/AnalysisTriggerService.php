@@ -30,6 +30,7 @@ class AnalysisTriggerService
     public function __construct(
         private readonly AnalysisScopeResolver $scopes,
         private readonly ProblemVisibilityService $visibility,
+        private readonly AnalysisJobDispatcher $dispatcher,
     ) {}
 
     /**
@@ -41,7 +42,7 @@ class AnalysisTriggerService
     public function trigger(Problem $problem, User $analyst, array $services, bool $force = false): array
     {
         try {
-            return DB::transaction(fn (): array => $this->create($problem, $analyst, $services, $force));
+            $result = DB::transaction(fn (): array => $this->create($problem, $analyst, $services, $force));
         } catch (QueryException $collision) {
             // Two instructors pressed at once. The partial unique indexes of
             // D-53 let exactly one INSERT through; the loser reads back the
@@ -60,6 +61,15 @@ class AnalysisTriggerService
 
             throw ConflictException::analysisInProgress($winner->id);
         }
+
+        // After the commit, never inside it: a job naming rows that were rolled
+        // back can never succeed (C3). A batch handed back unchanged has
+        // nothing to publish — its results already exist.
+        if ($result['created']) {
+            $this->dispatcher->dispatch($result['batch']);
+        }
+
+        return $result;
     }
 
     /**

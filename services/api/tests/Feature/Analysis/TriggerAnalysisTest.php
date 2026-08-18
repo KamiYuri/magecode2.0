@@ -8,6 +8,8 @@ use App\Enums\AnalysisStatus;
 use App\Enums\PublishMode;
 use App\Enums\SectionRole;
 use App\Enums\ServiceStatus;
+use App\Messaging\FakeJobPublisher;
+use App\Messaging\JobPublisher;
 use App\Models\AnalysisProblem;
 use App\Models\AnalysisSubmission;
 use App\Models\BankProblem;
@@ -18,6 +20,7 @@ use App\Models\Submission;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Testing\TestResponse;
 use Laravel\Sanctum\Sanctum;
 use Tests\Support\CreatesAcademicFixtures;
@@ -44,6 +47,15 @@ class TriggerAnalysisTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        // D2 publishes after the commit, so a trigger now signs URLs and hands
+        // messages to the broker: both are faked here, since what this suite
+        // is about is the rows the endpoint writes.
+        Storage::fake('minio');
+        Storage::disk('minio')->buildTemporaryUrlsUsing(
+            fn (string $path): string => "https://minio.test/{$path}"
+        );
+        $this->app->instance(JobPublisher::class, new FakeJobPublisher);
 
         $this->semester = $this->semesterIn($this->courseIn($this->organizationWithAdmin()), [
             'publish_mode' => PublishMode::Auto,
@@ -267,10 +279,15 @@ class TriggerAnalysisTest extends TestCase
         $this->assertTrue(AnalysisProblem::findOrFail($response->json('data.id'))->is_partial);
     }
 
-    /** D-54: a service that was not selected starts as not_applicable. */
+    /**
+     * D-54: a service that was not selected starts as not_applicable.
+     *
+     * Two submissions, not one: D2 parks a language group of one as
+     * `not_applicable` too, and that would hide what this case is about.
+     */
     public function test_unselected_services_are_marked_not_applicable(): void
     {
-        $this->submissionsFor($this->problem, 1);
+        $this->submissionsFor($this->problem, 2);
         Sanctum::actingAs($this->instructor);
 
         $response = $this->trigger(['services' => ['plagiarism-checker']])->assertCreated();
