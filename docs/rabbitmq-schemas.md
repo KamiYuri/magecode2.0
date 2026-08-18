@@ -131,8 +131,8 @@ String enum values used in `service` field:
 1. Collect all submissions in scope (semester-level, all sections with equivalent problems).
 2. Group by `programming_languages.dolos_language`.
 3. For each group with ≥ 2 submissions: publish 1 message.
-4. For groups with < 2 submissions: do NOT publish. Set `analysis_submissions.plagiarism_status = 'not_applicable'` for those submissions.
-5. Set `language_group_total` = number of groups published. If 0 groups qualify, mark SIM completed immediately.
+4. For groups with < 2 submissions, or whose `dolos_language` is null or outside the enum below: do NOT publish. Set `analysis_submissions.plagiarism_status = 'not_applicable'` for those submissions.
+5. Set `language_group_total` = number of groups published. If 0 groups qualify, nothing is published and every submission is `not_applicable`; closing the batch itself belongs to D6 (v3 §7, 2026-08-18).
 
 ```json
 {
@@ -181,7 +181,7 @@ String enum values used in `service` field:
 
 **Pattern:** 1 message per analysis_submission.
 **Trigger:** GV triggers analysis with AID enabled → api publishes 1 message per submission.
-**Language routing:** AID currently supports python, java, cpp. If unsupported, AID returns `status: "not_applicable"`.
+**Language routing:** the `language` field is read from `programming_languages.monaco_language` (v3 §7, 2026-08-18); a value outside the enum below is never published and the submission is marked `not_applicable` by api. AID itself currently supports python, java, cpp — a language it cannot model returns `status: "not_applicable"`.
 
 ```json
 {
