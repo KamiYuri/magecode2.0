@@ -30,4 +30,9 @@ final class InvalidResultMessage extends RuntimeException
     {
         return new self("result message carries unknown status {$status}");
     }
+
+    public static function unknownService(string $service): self
+    {
+        return new self("result message names unknown service {$service}");
+    }
 }

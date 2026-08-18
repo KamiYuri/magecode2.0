@@ -35,6 +35,8 @@ class QueueSchemaConformanceTest extends TestCase
 
     private const VULN_SCANNER_SCHEMA = 'shared/schemas/job.vuln-scanner.v1.schema.json';
 
+    private const ANALYSIS_RESULT_SCHEMA = 'shared/schemas/result.analysis.v1.schema.json';
+
     public function test_a_code_executor_job_matches_the_published_schema(): void
     {
         $job = new CodeExecutorJob(
@@ -183,6 +185,73 @@ class QueueSchemaConformanceTest extends TestCase
 
         $this->assertSame($keys, array_keys($this->aidJob()->toArray()));
         $this->assertSame($keys, array_keys($this->vulJob()->toArray()));
+    }
+
+    /**
+     * The result direction, which api consumes rather than produces: the
+     * fixtures D4's ingestion tests feed the handler are validated here, so a
+     * suite that passes against a message the real SIM could never send is
+     * caught rather than trusted.
+     */
+    public function test_the_sim_result_fixture_is_a_legal_message(): void
+    {
+        $this->assertValidates($this->simResult(), self::ANALYSIS_RESULT_SCHEMA);
+    }
+
+    public function test_a_sim_result_with_an_unordered_pair_is_still_legal(): void
+    {
+        // The schema documents the ordering but cannot express it, which is
+        // why `SimResultIngestor` normalises rather than trusting the producer.
+        $payload = $this->simResult();
+        $payload['pairs'][0]['submission_a_id'] = 999;
+
+        $this->assertValidates($payload, self::ANALYSIS_RESULT_SCHEMA);
+    }
+
+    /** `oneOf` discriminates on `service`; a value none of the branches names fits nothing. */
+    public function test_a_result_for_an_unknown_service_is_rejected(): void
+    {
+        $payload = $this->simResult();
+        $payload['service'] = 'sentiment-analyser';
+
+        $this->assertViolates($payload, self::ANALYSIS_RESULT_SCHEMA);
+    }
+
+    public function test_a_similarity_above_one_is_rejected(): void
+    {
+        $payload = $this->simResult();
+        $payload['pairs'][0]['similarity'] = 1.5;
+
+        $this->assertViolates($payload, self::ANALYSIS_RESULT_SCHEMA);
+    }
+
+    /** @return array<string, mixed> */
+    private function simResult(): array
+    {
+        return [
+            'analysis_problem_id' => 45,
+            'service' => 'plagiarism-checker',
+            'status' => 'completed',
+            'language' => 'python',
+            'language_group_index' => 0,
+            'language_group_total' => 1,
+            'pairs' => [[
+                'submission_a_id' => 101,
+                'submission_b_id' => 102,
+                'similarity' => 0.87,
+                'longest_fragment' => 42,
+                'total_overlap' => 128,
+                'a_regions' => '1,0,4,10',
+                'b_regions' => '2,0,5,10',
+            ]],
+            'submission_statuses' => [
+                ['analysis_submission_id' => 501, 'status' => 'completed'],
+                ['analysis_submission_id' => 502, 'status' => 'completed'],
+            ],
+            'trace_id' => (string) Str::uuid(),
+            'timestamp' => '2026-08-18T14:00:00Z',
+            'version' => '1.0',
+        ];
     }
 
     private function aidJob(): AiDetectorJob
