@@ -7,6 +7,7 @@ namespace App\Policies;
 use App\Enums\SectionRole;
 use App\Models\AnalysisProblem;
 use App\Models\Problem;
+use App\Models\Semester;
 use App\Models\User;
 use App\Services\MembershipService;
 
@@ -47,5 +48,23 @@ class AnalysisProblemPolicy
     public function cancel(User $user, AnalysisProblem $analysisProblem): bool
     {
         return $this->view($user, $analysisProblem);
+    }
+
+    /**
+     * D-58: grouping decides what a future batch compares, so it sits with the
+     * same people who may trigger one — an instructor teaching in the semester,
+     * or the Org Admin above it. Read and write share an ability because the
+     * listing names problems across sections.
+     */
+    public function manageMatchGroups(User $user, Semester $semester): bool
+    {
+        if ($this->memberships->isOrganizationAdmin($user, $semester->course->organization_id)) {
+            return true;
+        }
+
+        return $user->sectionMemberships()
+            ->where('role', SectionRole::Instructor)
+            ->whereHas('section', fn ($query) => $query->where('semester_id', $semester->id))
+            ->exists();
     }
 }

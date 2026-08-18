@@ -157,6 +157,16 @@ Route::prefix('v1')->group(function (): void {
         Route::post('problems/{problem}/analysis', [AnalysisController::class, 'store'])
             ->middleware('throttle:analysis')
             ->name('problems.analysis.store');
+        Route::get('problems/{problem}/analysis', [AnalysisController::class, 'latest'])
+            ->name('problems.analysis.latest');
+        Route::get('problems/{problem}/analysis/history', [AnalysisController::class, 'history'])
+            ->name('problems.analysis.history');
+        Route::post('analysis/{analysisProblem}/cancel', [AnalysisController::class, 'cancel'])
+            ->name('analysis.cancel');
+        Route::get('semesters/{semester}/match-groups', [AnalysisController::class, 'matchGroups'])
+            ->name('semesters.match-groups.index');
+        Route::post('semesters/{semester}/match-groups', [AnalysisController::class, 'storeMatchGroup'])
+            ->name('semesters.match-groups.store');
     });
 });
 
