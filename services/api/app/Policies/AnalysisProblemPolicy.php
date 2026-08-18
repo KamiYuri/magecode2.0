@@ -51,6 +51,16 @@ class AnalysisProblemPolicy
     }
 
     /**
+     * The semester dashboard aggregates every section's flagged counts, which
+     * is exactly the cross-section picture D-05/D-06 keep from an individual
+     * instructor — so openapi marks it "(Org Admin)" and it stays there.
+     */
+    public function viewOverview(User $user, Semester $semester): bool
+    {
+        return $this->memberships->isOrganizationAdmin($user, $semester->course->organization_id);
+    }
+
+    /**
      * D-58: grouping decides what a future batch compares, so it sits with the
      * same people who may trigger one — an instructor teaching in the semester,
      * or the Org Admin above it. Read and write share an ability because the

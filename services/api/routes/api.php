@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Http\Controllers\Admin;
 use App\Http\Controllers\AnalysisController;
+use App\Http\Controllers\AnalysisResultController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Auth\EmailVerificationController;
 use App\Http\Controllers\Auth\PasswordResetController;
@@ -167,6 +168,21 @@ Route::prefix('v1')->group(function (): void {
             ->name('semesters.match-groups.index');
         Route::post('semesters/{semester}/match-groups', [AnalysisController::class, 'storeMatchGroup'])
             ->name('semesters.match-groups.store');
+
+        // Reading a batch's results. Every one of these is redacted per viewer
+        // by AnalysisVisibilityService (D-05/D-06).
+        Route::get('analysis/{analysisProblem}/submissions', [AnalysisResultController::class, 'submissions'])
+            ->name('analysis.submissions.index');
+        Route::get('analysis/{analysisProblem}/similarity', [AnalysisResultController::class, 'similarity'])
+            ->name('analysis.similarity.index');
+        Route::get('analysis/{analysisProblem}/similarity/{similarityResult}', [AnalysisResultController::class, 'similarityDetail'])
+            ->name('analysis.similarity.show');
+        Route::get('analysis/{analysisProblem}/ai-detection', [AnalysisResultController::class, 'aiDetection'])
+            ->name('analysis.ai-detection.index');
+        Route::get('analysis/{analysisProblem}/vulnerabilities', [AnalysisResultController::class, 'vulnerabilities'])
+            ->name('analysis.vulnerabilities.index');
+        Route::get('semesters/{semester}/analysis-overview', [AnalysisResultController::class, 'overview'])
+            ->name('semesters.analysis-overview');
     });
 });
 
