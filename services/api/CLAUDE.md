@@ -6,10 +6,11 @@ Single writer to PostgreSQL in the batch path (D-80) and the only service expose
 through Traefik (D-86).
 
 ## Status
-Through D5: everything of M1 (auth, RBAC, entity CRUD, roster, problems), the submission
+Through D7: everything of M1 (auth, RBAC, entity CRUD, roster, problems), the submission
 endpoints and their MinIO storage, the AMQP publisher and the execution-result consumer, and
-Plan D's trigger, SIM/AID/VUL job publishing and the `result-analysis` ingestion.
-Next: D6 batch completion + events, then D7 timeout and D8 the read APIs. Open from M1: B9 tags,
+Plan D's trigger, SIM/AID/VUL job publishing, `result-analysis` ingestion, batch completion with
+its Reverb frames, and the D-82 timeout sweeper.
+Next: D8 analysis read APIs (privacy-tagged, gates M3). Open from M1: B9 tags,
 B10 problem bank, B12 profile + notifications.
 
 **Adding an endpoint?** `tests/Feature/Contract/RouteConformanceTest.php` fails until the
@@ -48,6 +49,13 @@ WebSockets, Pint + Larastan (level 6).
   is ever published, so do not reach for a public MinIO endpoint
 - `app/Models/Problem.php::visibleIn()` — the SQL mirror of `ProblemVisibilityService::isVisible()`;
   change one and change the other, or a listing disagrees with the `is_visible` it reports
+- `app/Services/Analysis/AnalysisCompletionService.php` — the only writer of
+  `analysis_problems.status` after creation. `close()` is conditional on `processing`, which is
+  what keeps `analysis.completed` firing once; D8's cancel must go through it too. Completion is
+  read from the rows, never from the cached SIM set (v3 §7, 2026-08-18)
+- `routes/channels.php` — `submission.{id}` is creator-only; `section.{id}` is section
+  instructors + Org Admins, TAs excluded. Suites that dispatch analysis events need
+  `Tests\Support\FakesAnalysisBroadcasts`: the tests run against the reverb driver on purpose
 - `app/Messaging/AnalysisResultHandler.php` + `app/Services/Analysis/*ResultIngestor.php` — the
   `result-analysis` side, run by `php artisan amqp:consume-analysis` (its twin
   `amqp:consume-execution` handles CES). api is the single writer of analysis rows (D-80), so

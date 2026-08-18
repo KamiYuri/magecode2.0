@@ -511,7 +511,11 @@ On each SIM result:
 A counter would advance on a redelivered message — the one event at-least-once delivery
 guarantees — and close a batch with a group still in flight. The set makes a repeat a no-op.
 
-If api restarts mid-tracking, the counter is lost. Recovery: scheduled timeout job (D-82) catches stuck batches after 30 minutes. Acceptable because SIM results are idempotent — if re-triggered, old results are replaced.
+If api restarts mid-tracking, the set is lost — and that is harmless, because **completion is
+decided from the `analysis_submissions` rows, not from this key** (v3 §7, 2026-08-18): a group
+whose message never arrived leaves its submissions at `in_queue`. The set is a cheap "is the SIM
+phase done" signal, cleared when the batch closes. The scheduled timeout job (D-82) remains the
+backstop for a batch nobody answers for at all.
 
 ---
 
