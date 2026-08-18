@@ -4,12 +4,18 @@ declare(strict_types=1);
 
 namespace App\Services\Analysis;
 
+use App\Enums\AiDetectorLanguage;
+use App\Enums\CodeqlLanguage;
 use App\Enums\ServiceStatus;
 use App\Messaging\JobPublisher;
+use App\Messaging\Jobs\AiDetectorJob;
 use App\Messaging\Jobs\PlagiarismCheckerJob;
+use App\Messaging\Jobs\VulnScannerJob;
 use App\Messaging\PublishFailed;
+use App\Messaging\QueueMessage;
 use App\Models\AnalysisProblem;
 use App\Services\SubmissionStorageService;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -41,6 +47,8 @@ class AnalysisJobDispatcher
         $this->signed = [];
 
         $this->dispatchPlagiarismChecks($batch);
+        $this->dispatchAiDetection($batch);
+        $this->dispatchVulnerabilityScans($batch);
     }
 
     /**
@@ -84,6 +92,116 @@ class AnalysisJobDispatcher
     }
 
     /**
+     * AID: one message per submission (`rabbitmq-schemas.md` §3.3), routed on
+     * `monaco_language` (v3 §7, 2026-08-18). A value the job schema's enum does
+     * not carry cannot be published, so that submission parks instead.
+     */
+    private function dispatchAiDetection(AnalysisProblem $batch): void
+    {
+        $rows = $this->pendingRows($batch, 'ai_detection_status', 'monaco_language');
+
+        /** @var list<array{0: \stdClass, 1: AiDetectorLanguage}> $publishable */
+        $publishable = [];
+        /** @var list<int> $parked */
+        $parked = [];
+
+        foreach ($rows as $row) {
+            $language = $row->language === null ? null : AiDetectorLanguage::tryFrom((string) $row->language);
+
+            if ($language === null) {
+                $parked[] = (int) $row->analysis_submission_id;
+
+                continue;
+            }
+
+            $publishable[] = [$row, $language];
+        }
+
+        // Parked before published: a broker that hangs must not leave rows
+        // that were never going to be sent looking like rows still in flight.
+        if ($parked !== []) {
+            $this->park($parked, 'ai_detection_status');
+        }
+
+        foreach ($publishable as [$row, $language]) {
+            $this->publish(AiDetectorJob::for(
+                (int) $row->analysis_submission_id,
+                (int) $row->submission_id,
+                $this->fileUrl((string) $row->file_path),
+                $language,
+            ), $batch);
+        }
+    }
+
+    /**
+     * VUL: one message per submission, gated on `codeql_language`. Null there
+     * means CodeQL has no analyser for the language at all, which the roadmap
+     * makes an explicit `not_applicable` rather than a job.
+     */
+    private function dispatchVulnerabilityScans(AnalysisProblem $batch): void
+    {
+        $rows = $this->pendingRows($batch, 'vuln_scan_status', 'codeql_language');
+
+        /** @var list<array{0: \stdClass, 1: CodeqlLanguage}> $publishable */
+        $publishable = [];
+        /** @var list<int> $parked */
+        $parked = [];
+
+        foreach ($rows as $row) {
+            $language = $row->language === null ? null : CodeqlLanguage::tryFrom((string) $row->language);
+
+            if ($language === null) {
+                $parked[] = (int) $row->analysis_submission_id;
+
+                continue;
+            }
+
+            $publishable[] = [$row, $language];
+        }
+
+        if ($parked !== []) {
+            $this->park($parked, 'vuln_scan_status');
+        }
+
+        foreach ($publishable as [$row, $language]) {
+            $this->publish(VulnScannerJob::for(
+                (int) $row->analysis_submission_id,
+                (int) $row->submission_id,
+                $this->fileUrl((string) $row->file_path),
+                $language,
+            ), $batch);
+        }
+    }
+
+    /**
+     * The batch's submissions still waiting on one service, with the language
+     * column that service routes on aliased to `language`.
+     *
+     * A service that was not requested has already been written
+     * `not_applicable` by D1, so its query returns nothing and its dispatch is
+     * a no-op.
+     *
+     * @param  'plagiarism_status'|'ai_detection_status'|'vuln_scan_status'  $statusColumn
+     * @param  'dolos_language'|'monaco_language'|'codeql_language'  $languageColumn
+     * @return Collection<int, \stdClass>
+     */
+    private function pendingRows(AnalysisProblem $batch, string $statusColumn, string $languageColumn): Collection
+    {
+        return DB::table('analysis_submissions as entry')
+            ->join('submissions as submission', 'submission.id', '=', 'entry.submission_id')
+            ->leftJoin('programming_languages as language', 'language.id', '=', 'submission.programming_language_id')
+            ->where('entry.analysis_problem_id', $batch->id)
+            ->where("entry.{$statusColumn}", ServiceStatus::InQueue->value)
+            ->orderBy('entry.id')
+            ->get([
+                'entry.id as analysis_submission_id',
+                'submission.id as submission_id',
+                'submission.file_path',
+                "language.{$languageColumn} as language",
+            ]);
+    }
+
+    /**
      * The batch's submissions that still wait on SIM, with everything the
      * message needs: both ids, the object key, and the raw `dolos_language`
      * the grouping rule decides on.
@@ -92,25 +210,13 @@ class AnalysisJobDispatcher
      */
     private function plagiarismRefs(AnalysisProblem $batch): array
     {
-        $rows = DB::table('analysis_submissions as entry')
-            ->join('submissions as submission', 'submission.id', '=', 'entry.submission_id')
-            ->leftJoin('programming_languages as language', 'language.id', '=', 'submission.programming_language_id')
-            ->where('entry.analysis_problem_id', $batch->id)
-            ->where('entry.plagiarism_status', ServiceStatus::InQueue->value)
-            ->orderBy('entry.id')
-            ->get([
-                'entry.id as analysis_submission_id',
-                'submission.id as submission_id',
-                'submission.file_path',
-                'language.dolos_language',
-            ]);
-
-        return $rows->map(fn (object $row): SimSubmissionRef => new SimSubmissionRef(
-            analysisSubmissionId: (int) $row->analysis_submission_id,
-            submissionId: (int) $row->submission_id,
-            filePath: (string) $row->file_path,
-            dolosLanguage: $row->dolos_language === null ? null : (string) $row->dolos_language,
-        ))->all();
+        return $this->pendingRows($batch, 'plagiarism_status', 'dolos_language')
+            ->map(fn (\stdClass $row): SimSubmissionRef => new SimSubmissionRef(
+                analysisSubmissionId: (int) $row->analysis_submission_id,
+                submissionId: (int) $row->submission_id,
+                filePath: (string) $row->file_path,
+                dolosLanguage: $row->language === null ? null : (string) $row->language,
+            ))->all();
     }
 
     /**
@@ -141,7 +247,7 @@ class AnalysisJobDispatcher
      *
      * @param  array<string, mixed>  $context
      */
-    private function publish(PlagiarismCheckerJob $job, AnalysisProblem $batch, array $context = []): void
+    private function publish(QueueMessage $job, AnalysisProblem $batch, array $context = []): void
     {
         try {
             $this->publisher->publish($job);

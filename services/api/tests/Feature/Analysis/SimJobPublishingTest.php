@@ -180,7 +180,8 @@ class SimJobPublishingTest extends TestCase
         Sanctum::actingAs($this->instructor);
         $this->trigger(['services' => ['ai-detector']])->assertCreated();
 
-        $this->publisher->assertNothingPublished();
+        // AID publishes on its own queue (D3); what must be silent is SIM's.
+        $this->assertSame([], $this->publisher->published(PlagiarismCheckerJob::QUEUE));
         $this->assertSame(2, AnalysisSubmission::where('plagiarism_status', ServiceStatus::NotApplicable)->count());
     }
 

@@ -6,17 +6,19 @@ Single writer to PostgreSQL in the batch path (D-80) and the only service expose
 through Traefik (D-86).
 
 ## Status
-Through B8 + B11 + C1: migrations + models + seeders, auth, the RBAC policy layer, CRUD for
-organizations/courses/semesters/sections + org members, roster import/transfer, the problem &
-test-case lifecycle, the route/envelope contract tests, and the MinIO storage layer.
-Next: C2 submission endpoints, B10 problem bank.
+Through D3: everything of M1 (auth, RBAC, entity CRUD, roster, problems), the submission
+endpoints and their MinIO storage, the AMQP publisher and the execution-result consumer, and
+Plan D's trigger plus SIM/AID/VUL job publishing.
+Next: D4/D5 analysis result handlers, then D6 batch completion. Open from M1: B9 tags, B10
+problem bank, B12 profile + notifications.
 
 **Adding an endpoint?** `tests/Feature/Contract/RouteConformanceTest.php` fails until the
 route matches openapi.yml — strike your operation from its `PENDING` list in the same commit.
 
 ## Tech Stack
 PHP 8.4 (Docker) / 8.3+ (host constraint `^8.3`), Laravel 13, Sanctum bearer tokens,
-`bschmitt/laravel-amqp` for RabbitMQ, Reverb for WebSockets, Pint + Larastan (level 6).
+`php-amqplib` for RabbitMQ (C3 dropped `bschmitt/laravel-amqp`; see v3 §7), Reverb for
+WebSockets, Pint + Larastan (level 6).
 
 ## Key Files
 - `routes/api.php` — every endpoint under `/api/v1` (U-3); `/api/health` alias for probes.
@@ -29,6 +31,14 @@ PHP 8.4 (Docker) / 8.3+ (host constraint `^8.3`), Laravel 13, Sanctum bearer tok
 - `app/Services/` — `MembershipService` (who is what, where), `OrganizationMemberService`
   (bulk add + last-admin guard), `UserProvisioningService` (email → first-time account),
   `ProblemVisibilityService` (D-16 effective publish/lock), `ProblemService`, `TestCaseService`
+- `app/Services/Analysis/AnalysisJobDispatcher.php` — the only publisher of analysis jobs
+  (SIM/AID/VUL), called after the trigger's transaction commits and only for a batch that
+  request created. D4/D5 must not add a second publisher. Each service has its own language
+  gate — `dolos_language`, `monaco_language`, `codeql_language` — and a value outside that
+  job schema's enum parks the submission as `not_applicable` rather than publishing a message
+  the worker would reject (v3 §7, 2026-08-18)
+- `app/Services/Analysis/SimJobPlan.php` — SIM's grouping rule with no DB and no broker;
+  group and submission ordering is contractual, because `language_group_index` is positional
 - `app/Services/SubmissionStorageService.php` — the only writer of submission objects; its key
   must stay byte-identical to `shared/go/storage/storage.go::SubmissionPath`, which the
   code-executor uses to read the same objects back
