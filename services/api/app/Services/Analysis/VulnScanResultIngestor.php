@@ -22,6 +22,8 @@ use Illuminate\Support\Facades\Log;
  */
 class VulnScanResultIngestor
 {
+    public function __construct(private readonly AnalysisCompletionService $completion) {}
+
     /** @param array<string, mixed> $message */
     public function ingest(array $message): void
     {
@@ -53,6 +55,8 @@ class VulnScanResultIngestor
                 ->where('id', $entryId)
                 ->update(['vuln_scan_status' => $status->value, 'updated_at' => now()]);
         });
+
+        $this->completion->settle($entry->analysisProblem);
     }
 
     /**

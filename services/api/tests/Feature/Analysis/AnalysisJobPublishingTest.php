@@ -29,6 +29,7 @@ use Illuminate\Testing\TestResponse;
 use Laravel\Sanctum\Sanctum;
 use RuntimeException;
 use Tests\Support\CreatesAcademicFixtures;
+use Tests\Support\FakesAnalysisBroadcasts;
 use Tests\TestCase;
 
 /**
@@ -43,6 +44,7 @@ use Tests\TestCase;
 class AnalysisJobPublishingTest extends TestCase
 {
     use CreatesAcademicFixtures;
+    use FakesAnalysisBroadcasts;
     use RefreshDatabase;
 
     private Semester $semester;
@@ -58,6 +60,8 @@ class AnalysisJobPublishingTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        $this->fakeAnalysisBroadcasts();
 
         Storage::fake('minio');
         Storage::disk('minio')->buildTemporaryUrlsUsing(
@@ -164,6 +168,21 @@ class AnalysisJobPublishingTest extends TestCase
         $entry = AnalysisSubmission::firstOrFail();
         $this->assertSame(ServiceStatus::NotApplicable, $entry->ai_detection_status);
         $this->assertSame(ServiceStatus::NotApplicable, $entry->vuln_scan_status);
+    }
+
+    /**
+     * `started_at` is the moment the work reached the workers — the row is
+     * created before any job exists and the first result lands long after, so
+     * the dispatcher is the only place that can say it.
+     */
+    public function test_publishing_stamps_started_at(): void
+    {
+        $this->submissionsIn(['monaco_language' => 'python', 'codeql_language' => 'python'], 1);
+
+        Sanctum::actingAs($this->instructor);
+        $this->trigger(['services' => ['ai-detector']])->assertCreated();
+
+        $this->assertNotNull(AnalysisSubmission::firstOrFail()->started_at);
     }
 
     public function test_a_service_that_was_not_requested_publishes_nothing(): void

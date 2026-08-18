@@ -40,15 +40,35 @@ class AnalysisJobDispatcher
     public function __construct(
         private readonly JobPublisher $publisher,
         private readonly SubmissionStorageService $storage,
+        private readonly AnalysisCompletionService $completion,
     ) {}
 
     public function dispatch(AnalysisProblem $batch): void
     {
         $this->signed = [];
 
+        $this->markStarted($batch);
+
         $this->dispatchPlagiarismChecks($batch);
         $this->dispatchAiDetection($batch);
         $this->dispatchVulnerabilityScans($batch);
+
+        // A batch every service parked as `not_applicable` receives no result
+        // message ever, so this is its only chance to close (D6).
+        $this->completion->settle($batch);
+    }
+
+    /**
+     * `started_at` is the moment the work was handed to the workers. Nothing
+     * else in the pipeline is in a position to say so: the row is created
+     * before any job exists, and the first result arrives long after.
+     */
+    private function markStarted(AnalysisProblem $batch): void
+    {
+        DB::table('analysis_submissions')
+            ->where('analysis_problem_id', $batch->id)
+            ->whereNull('started_at')
+            ->update(['started_at' => now(), 'updated_at' => now()]);
     }
 
     /**

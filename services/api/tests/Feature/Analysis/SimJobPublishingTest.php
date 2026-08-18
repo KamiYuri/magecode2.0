@@ -30,6 +30,7 @@ use Illuminate\Testing\TestResponse;
 use Laravel\Sanctum\Sanctum;
 use RuntimeException;
 use Tests\Support\CreatesAcademicFixtures;
+use Tests\Support\FakesAnalysisBroadcasts;
 use Tests\TestCase;
 
 /**
@@ -45,6 +46,7 @@ use Tests\TestCase;
 class SimJobPublishingTest extends TestCase
 {
     use CreatesAcademicFixtures;
+    use FakesAnalysisBroadcasts;
     use RefreshDatabase;
 
     private Semester $semester;
@@ -60,6 +62,8 @@ class SimJobPublishingTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        $this->fakeAnalysisBroadcasts();
 
         Storage::fake('minio');
         // The faked disk is a local one, whose temporaryUrl() throws; the
@@ -157,12 +161,11 @@ class SimJobPublishingTest extends TestCase
     }
 
     /**
-     * D6 owns `analysis_problems.status`; D2 only writes the per-submission
-     * statuses, so a batch with nothing to publish stays `processing` until
-     * D6 lands. Asserted rather than assumed, so the day D6 changes it, this
-     * test says so.
+     * A batch that published nothing receives no result message ever, so the
+     * dispatcher is its only chance to close (D6) — otherwise it would sit at
+     * `processing` until D7's sweeper called it a timeout.
      */
-    public function test_a_batch_with_no_qualifying_group_stays_processing(): void
+    public function test_a_batch_with_no_qualifying_group_closes_immediately(): void
     {
         $this->submissionsIn('python', 1);
 
@@ -170,7 +173,10 @@ class SimJobPublishingTest extends TestCase
         $batchId = (int) $this->trigger()->assertCreated()->json('data.id');
 
         $this->publisher->assertNothingPublished();
-        $this->assertSame(AnalysisStatus::Processing, AnalysisProblem::findOrFail($batchId)->status);
+
+        $batch = AnalysisProblem::findOrFail($batchId);
+        $this->assertSame(AnalysisStatus::Completed, $batch->status);
+        $this->assertNotNull($batch->completed_at);
     }
 
     public function test_a_batch_without_sim_publishes_nothing(): void

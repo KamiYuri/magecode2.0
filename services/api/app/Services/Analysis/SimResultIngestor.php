@@ -31,6 +31,8 @@ class SimResultIngestor
      */
     private const COMPLETION_TTL_SECONDS = 86400;
 
+    public function __construct(private readonly AnalysisCompletionService $completion) {}
+
     /** @param array<string, mixed> $message */
     public function ingest(array $message): void
     {
@@ -56,6 +58,11 @@ class SimResultIngestor
         });
 
         $this->recordGroup($batchId, $message);
+
+        // After the write, never inside it: the frame tells a browser to read
+        // rows, and a transaction that later rolls back would have promised
+        // data nobody can fetch.
+        $this->completion->settle($batch);
     }
 
     /**

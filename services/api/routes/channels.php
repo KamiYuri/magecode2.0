@@ -2,8 +2,10 @@
 
 declare(strict_types=1);
 
+use App\Models\Section;
 use App\Models\Submission;
 use App\Models\User;
+use App\Services\MembershipService;
 use Illuminate\Support\Facades\Broadcast;
 
 /*
@@ -26,4 +28,25 @@ Broadcast::channel('submission.{submissionId}', function (User $user, int $submi
         ->whereKey($submissionId)
         ->where('creator_id', $user->id)
         ->exists();
+});
+
+/**
+ * Analysis progress and completion for one section (U-8).
+ *
+ * Instructors of the section, plus the Org Admin above it. **TAs are
+ * excluded**: `openapi.yml` says "Section instructors", and the 2026-08-12
+ * amendment already removed a TA's read access to analysis results — a live
+ * push must never be wider than the HTTP surface it mirrors.
+ */
+Broadcast::channel('section.{sectionId}', function (User $user, int $sectionId): bool {
+    $section = Section::find($sectionId);
+
+    if ($section === null) {
+        return false;
+    }
+
+    $memberships = app(MembershipService::class);
+
+    return $memberships->isSectionInstructor($user, $section)
+        || $memberships->administersSection($user, $section);
 });
