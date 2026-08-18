@@ -25,6 +25,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Tests\Support\CreatesAcademicFixtures;
+use Tests\Support\FakesAnalysisBroadcasts;
 use Tests\TestCase;
 
 /**
@@ -38,6 +39,7 @@ use Tests\TestCase;
 class SimResultIngestionTest extends TestCase
 {
     use CreatesAcademicFixtures;
+    use FakesAnalysisBroadcasts;
     use RefreshDatabase;
 
     private Semester $semester;
@@ -53,6 +55,8 @@ class SimResultIngestionTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        $this->fakeAnalysisBroadcasts();
 
         $this->semester = $this->semesterIn($this->courseIn($this->organizationWithAdmin()));
         $this->section = $this->sectionIn($this->semester);
@@ -223,8 +227,10 @@ class SimResultIngestionTest extends TestCase
 
     public function test_the_completion_set_fills_one_group_at_a_time(): void
     {
-        $this->enrol($this->problem);
-        $this->enrol($this->problem);
+        // AID left waiting, so the batch stays open — D6 forgets the key as
+        // soon as it closes, which is what the next suite asserts.
+        $this->enrol($this->problem, awaitingAiDetection: true);
+        $this->enrol($this->problem, awaitingAiDetection: true);
 
         $first = $this->simResult();
         $first['language_group_index'] = 0;
@@ -244,8 +250,8 @@ class SimResultIngestionTest extends TestCase
     /** U-9 as a plain counter would call this batch complete with one group missing. */
     public function test_a_redelivered_group_does_not_advance_the_completion_set(): void
     {
-        $this->enrol($this->problem);
-        $this->enrol($this->problem);
+        $this->enrol($this->problem, awaitingAiDetection: true);
+        $this->enrol($this->problem, awaitingAiDetection: true);
 
         $message = $this->simResult();
         $message['language_group_total'] = 2;
@@ -331,8 +337,11 @@ class SimResultIngestionTest extends TestCase
     }
 
     /** A submission by a fresh student, enrolled in the batch and waiting on SIM. */
-    private function enrol(Problem $problem, ?ProgrammingLanguage $language = null): Submission
-    {
+    private function enrol(
+        Problem $problem,
+        ?ProgrammingLanguage $language = null,
+        bool $awaitingAiDetection = false,
+    ): Submission {
         $submission = Submission::factory()->create([
             'problem_id' => $problem->id,
             'creator_id' => $this->sectionMember($problem->section, SectionRole::Student)->id,
@@ -343,6 +352,7 @@ class SimResultIngestionTest extends TestCase
             'analysis_problem_id' => $this->batch->id,
             'submission_id' => $submission->id,
             'plagiarism_status' => ServiceStatus::InQueue,
+            'ai_detection_status' => $awaitingAiDetection ? ServiceStatus::InQueue : ServiceStatus::NotApplicable,
         ]);
 
         return $submission;

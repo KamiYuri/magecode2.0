@@ -24,6 +24,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Testing\TestResponse;
 use Laravel\Sanctum\Sanctum;
 use Tests\Support\CreatesAcademicFixtures;
+use Tests\Support\FakesAnalysisBroadcasts;
 use Tests\TestCase;
 
 /**
@@ -34,6 +35,7 @@ use Tests\TestCase;
 class TriggerAnalysisTest extends TestCase
 {
     use CreatesAcademicFixtures;
+    use FakesAnalysisBroadcasts;
     use RefreshDatabase;
 
     private Semester $semester;
@@ -47,6 +49,8 @@ class TriggerAnalysisTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        $this->fakeAnalysisBroadcasts();
 
         // D2 publishes after the commit, so a trigger now signs URLs and hands
         // messages to the broker: both are faked here, since what this suite

@@ -16,6 +16,7 @@ use App\Services\Analysis\AnalysisTriggerService;
 use Illuminate\Foundation\Testing\DatabaseTruncation;
 use Illuminate\Support\Facades\DB;
 use Tests\Support\CreatesAcademicFixtures;
+use Tests\Support\FakesAnalysisBroadcasts;
 use Tests\TestCase;
 
 /**
@@ -31,6 +32,7 @@ class AnalysisTriggerConcurrencyTest extends TestCase
 {
     use CreatesAcademicFixtures;
     use DatabaseTruncation;
+    use FakesAnalysisBroadcasts;
 
     private const CHILD_CREATED = 0;
 
@@ -41,6 +43,8 @@ class AnalysisTriggerConcurrencyTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        $this->fakeAnalysisBroadcasts();
 
         if (! function_exists('pcntl_fork')) {
             $this->markTestSkipped('pcntl is required to trigger from two processes at once.');

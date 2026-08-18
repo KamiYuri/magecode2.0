@@ -22,6 +22,7 @@ use Illuminate\Log\Events\MessageLogged;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Tests\Support\CreatesAcademicFixtures;
+use Tests\Support\FakesAnalysisBroadcasts;
 use Tests\TestCase;
 
 /**
@@ -35,6 +36,7 @@ use Tests\TestCase;
 class AnalysisResultIngestionTest extends TestCase
 {
     use CreatesAcademicFixtures;
+    use FakesAnalysisBroadcasts;
     use RefreshDatabase;
 
     private Semester $semester;
@@ -48,6 +50,8 @@ class AnalysisResultIngestionTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        $this->fakeAnalysisBroadcasts();
 
         $this->semester = $this->semesterIn($this->courseIn($this->organizationWithAdmin()));
         $this->section = $this->sectionIn($this->semester);
