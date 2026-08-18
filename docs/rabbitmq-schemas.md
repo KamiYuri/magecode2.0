@@ -495,16 +495,21 @@ THEN (for all services):
 
 ### 5.3. SIM Completion Tracking Detail
 
-api maintains a counter (in-memory or Redis) per `analysis_problem_id`:
+api maintains, per `analysis_problem_id`, the **set** of group indexes it has received — not a
+running count (v3 §7, 2026-08-18). Held in Laravel's `cache` (database store; there is no Redis)
+under a cache lock:
 
 ```
 Key: sim_completion:{analysis_problem_id}
-Value: { received: 0, total: language_group_total }
+Value: { total: language_group_total, received: [language_group_index, ...] }
 
 On each SIM result:
-  received++
-  if received == total → SIM phase complete for this batch
+  received = received ∪ { language_group_index }
+  if count(received) == total → SIM phase complete for this batch
 ```
+
+A counter would advance on a redelivered message — the one event at-least-once delivery
+guarantees — and close a batch with a group still in flight. The set makes a repeat a no-op.
 
 If api restarts mid-tracking, the counter is lost. Recovery: scheduled timeout job (D-82) catches stuck batches after 30 minutes. Acceptable because SIM results are idempotent — if re-triggered, old results are replaced.
 
