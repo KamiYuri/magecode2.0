@@ -225,6 +225,80 @@ class QueueSchemaConformanceTest extends TestCase
         $this->assertViolates($payload, self::ANALYSIS_RESULT_SCHEMA);
     }
 
+    public function test_the_aid_result_fixture_is_a_legal_message(): void
+    {
+        $this->assertValidates($this->aidResult(), self::ANALYSIS_RESULT_SCHEMA);
+    }
+
+    /** The schema permits it; `AiDetectionResultIngestor` records it as an error. */
+    public function test_a_completed_aid_result_with_a_null_probability_is_legal(): void
+    {
+        $payload = $this->aidResult();
+        $payload['probability'] = null;
+
+        $this->assertValidates($payload, self::ANALYSIS_RESULT_SCHEMA);
+    }
+
+    public function test_the_vul_result_fixture_is_a_legal_message(): void
+    {
+        $this->assertValidates($this->vulResult(), self::ANALYSIS_RESULT_SCHEMA);
+    }
+
+    public function test_a_finding_severity_outside_the_enum_is_rejected(): void
+    {
+        $payload = $this->vulResult();
+        $payload['findings'][0]['severity'] = 'catastrophic';
+
+        $this->assertViolates($payload, self::ANALYSIS_RESULT_SCHEMA);
+    }
+
+    /** `not_applicable` is a result status the job schemas have no counterpart for. */
+    public function test_not_applicable_is_a_legal_result_status(): void
+    {
+        foreach ([$this->aidResult(), $this->vulResult()] as $payload) {
+            $payload['status'] = 'not_applicable';
+
+            $this->assertValidates($payload, self::ANALYSIS_RESULT_SCHEMA);
+        }
+    }
+
+    /** @return array<string, mixed> */
+    private function aidResult(): array
+    {
+        return [
+            'analysis_submission_id' => 501,
+            'service' => 'ai-detector',
+            'status' => 'completed',
+            'probability' => 0.9312,
+            'trace_id' => (string) Str::uuid(),
+            'timestamp' => '2026-08-18T14:00:00Z',
+            'version' => '1.0',
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private function vulResult(): array
+    {
+        return [
+            'analysis_submission_id' => 501,
+            'service' => 'vuln-scanner',
+            'status' => 'completed',
+            'findings' => [[
+                'name' => 'py/sql-injection',
+                'description' => 'Untrusted input reaches a query.',
+                'severity' => 'error',
+                'file_path' => 'main.py',
+                'start_line' => 12,
+                'start_column' => 4,
+                'end_line' => 12,
+                'end_column' => 40,
+            ]],
+            'trace_id' => (string) Str::uuid(),
+            'timestamp' => '2026-08-18T14:00:00Z',
+            'version' => '1.0',
+        ];
+    }
+
     /** @return array<string, mixed> */
     private function simResult(): array
     {

@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Messaging;
 
 use App\Enums\AnalysisService;
+use App\Services\Analysis\AiDetectionResultIngestor;
 use App\Services\Analysis\SimResultIngestor;
+use App\Services\Analysis\VulnScanResultIngestor;
 use JsonException;
 
 /**
@@ -20,7 +22,11 @@ class AnalysisResultHandler
 {
     private const REQUIRED = ['service', 'status', 'trace_id'];
 
-    public function __construct(private readonly SimResultIngestor $sim) {}
+    public function __construct(
+        private readonly SimResultIngestor $sim,
+        private readonly AiDetectionResultIngestor $aid,
+        private readonly VulnScanResultIngestor $vul,
+    ) {}
 
     /** @throws InvalidResultMessage */
     public function handle(string $body): void
@@ -30,6 +36,8 @@ class AnalysisResultHandler
 
         match (AnalysisService::tryFrom($service)) {
             AnalysisService::PlagiarismChecker => $this->sim->ingest($message),
+            AnalysisService::AiDetector => $this->aid->ingest($message),
+            AnalysisService::VulnScanner => $this->vul->ingest($message),
             // A service api does not know reads no better on a retry, so the
             // consumer drops it rather than requeueing it into a loop.
             default => throw InvalidResultMessage::unknownService($service),
