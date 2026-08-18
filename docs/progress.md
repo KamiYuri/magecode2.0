@@ -60,7 +60,7 @@ profile + notifications — and B10, which M5 owns, stay open.)
 | Task | Prio | Status | Ref | Notes |
 |---|---|---|---|---|
 | D1 trigger + scope + is_latest | P0 | done | `api/feat/analysis-trigger` | `AnalysisScope` + `AnalysisScopeResolver` are what D2/D4/D8 should reuse — `resolveAndClaim` takes a **row lock on the problem**, without which two concurrent triggers each mint a UUID and create two batches in two scopes. 200-with-existing vs 201-new per v3 §7 |
-| D2 sim job building | P0 | todo | — | — |
+| D2 sim job building | P0 | wip | `api/feat/sim-job-publishing` | — |
 | D3 aid/vul job publishing | P0 | todo | — | — |
 | D4 sim result handler | P0 | todo | — | — |
 | D5 aid/vul result handlers | P0 | todo | — | — |
