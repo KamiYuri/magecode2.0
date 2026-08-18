@@ -6,11 +6,11 @@ Single writer to PostgreSQL in the batch path (D-80) and the only service expose
 through Traefik (D-86).
 
 ## Status
-Through D3: everything of M1 (auth, RBAC, entity CRUD, roster, problems), the submission
+Through D5: everything of M1 (auth, RBAC, entity CRUD, roster, problems), the submission
 endpoints and their MinIO storage, the AMQP publisher and the execution-result consumer, and
-Plan D's trigger plus SIM/AID/VUL job publishing.
-Next: D4/D5 analysis result handlers, then D6 batch completion. Open from M1: B9 tags, B10
-problem bank, B12 profile + notifications.
+Plan D's trigger, SIM/AID/VUL job publishing and the `result-analysis` ingestion.
+Next: D6 batch completion + events, then D7 timeout and D8 the read APIs. Open from M1: B9 tags,
+B10 problem bank, B12 profile + notifications.
 
 **Adding an endpoint?** `tests/Feature/Contract/RouteConformanceTest.php` fails until the
 route matches openapi.yml — strike your operation from its `PENDING` list in the same commit.
@@ -48,6 +48,10 @@ WebSockets, Pint + Larastan (level 6).
   is ever published, so do not reach for a public MinIO endpoint
 - `app/Models/Problem.php::visibleIn()` — the SQL mirror of `ProblemVisibilityService::isVisible()`;
   change one and change the other, or a listing disagrees with the `is_visible` it reports
+- `app/Messaging/AnalysisResultHandler.php` + `app/Services/Analysis/*ResultIngestor.php` — the
+  `result-analysis` side, run by `php artisan amqp:consume-analysis` (its twin
+  `amqp:consume-execution` handles CES). api is the single writer of analysis rows (D-80), so
+  every result write in the batch path goes through here
 - `app/Http/Controllers/HealthController.php` — readiness probe (503 when DB is down)
 - `config/database.php` — pgsql `ATTR_EMULATE_PREPARES` for PgBouncer transaction pooling (D-89)
 - `Dockerfile` — targets `api` (nginx+FPM), `reverb`, `test`; deps resolved inside the
