@@ -11,8 +11,7 @@ endpoints and their MinIO storage, the AMQP publisher and the execution-result c
 Plan D's trigger, SIM/AID/VUL job publishing, `result-analysis` ingestion, batch completion with
 its Reverb frames, the D-82 timeout sweeper and the two-tier analysis read APIs.
 Next: Plan E (the workers) is what M3's gate now waits on. Open from M1: B9 tags, B10 problem
-bank, B12 profile + notifications. Open from M1: B9 tags,
-B10 problem bank, B12 profile + notifications.
+bank, B12 profile + notifications.
 
 **Adding an endpoint?** `tests/Feature/Contract/RouteConformanceTest.php` fails until the
 route matches openapi.yml — strike your operation from its `PENDING` list in the same commit.
