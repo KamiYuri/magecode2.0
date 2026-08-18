@@ -4,9 +4,13 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Contract;
 
+use App\Enums\AiDetectorLanguage;
+use App\Enums\CodeqlLanguage;
 use App\Enums\DolosLanguage;
+use App\Messaging\Jobs\AiDetectorJob;
 use App\Messaging\Jobs\CodeExecutorJob;
 use App\Messaging\Jobs\PlagiarismCheckerJob;
+use App\Messaging\Jobs\VulnScannerJob;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 use JsonSchema\Constraints\Constraint;
@@ -26,6 +30,10 @@ class QueueSchemaConformanceTest extends TestCase
     private const CODE_EXECUTOR_SCHEMA = 'shared/schemas/job.code-executor.v1.schema.json';
 
     private const PLAGIARISM_CHECKER_SCHEMA = 'shared/schemas/job.plagiarism-checker.v1.schema.json';
+
+    private const AI_DETECTOR_SCHEMA = 'shared/schemas/job.ai-detector.v1.schema.json';
+
+    private const VULN_SCANNER_SCHEMA = 'shared/schemas/job.vuln-scanner.v1.schema.json';
 
     public function test_a_code_executor_job_matches_the_published_schema(): void
     {
@@ -132,6 +140,73 @@ class QueueSchemaConformanceTest extends TestCase
             array_keys($payload['submissions'][0]),
         );
         $this->assertSame('1.0', $payload['version']);
+    }
+
+    public function test_an_ai_detector_job_matches_the_published_schema(): void
+    {
+        $this->assertValidates($this->aidJob()->toArray(), self::AI_DETECTOR_SCHEMA);
+    }
+
+    public function test_an_ai_detector_job_with_an_unexpected_key_is_rejected(): void
+    {
+        $payload = $this->aidJob()->toArray();
+        $payload['analysis_problem_id'] = 45;
+
+        $this->assertViolates($payload, self::AI_DETECTOR_SCHEMA);
+    }
+
+    public function test_a_vuln_scanner_job_matches_the_published_schema(): void
+    {
+        $this->assertValidates($this->vulJob()->toArray(), self::VULN_SCANNER_SCHEMA);
+    }
+
+    /**
+     * CodeQL has no analyser for C on its own — `cpp` covers both — so the VUL
+     * schema's enum is one member shorter than AID's, and `CodeqlLanguage`
+     * carries that difference. A C submission is scanned as `cpp` through
+     * `programming_languages.codeql_language`, which is covered in
+     * `AnalysisJobPublishingTest`.
+     */
+    public function test_c_is_not_a_codeql_language(): void
+    {
+        $payload = $this->vulJob()->toArray();
+        $payload['language'] = 'c';
+
+        $this->assertViolates($payload, self::VULN_SCANNER_SCHEMA);
+    }
+
+    /** Both per-submission jobs carry the same keys in the same order. */
+    public function test_the_per_submission_payloads_carry_only_the_documented_keys(): void
+    {
+        $keys = ['analysis_submission_id', 'submission_id', 'file_url', 'language',
+            'trace_id', 'timestamp', 'version'];
+
+        $this->assertSame($keys, array_keys($this->aidJob()->toArray()));
+        $this->assertSame($keys, array_keys($this->vulJob()->toArray()));
+    }
+
+    private function aidJob(): AiDetectorJob
+    {
+        return new AiDetectorJob(
+            analysisSubmissionId: 501,
+            submissionId: 101,
+            fileUrl: 'https://minio.test/a?sig=1',
+            language: AiDetectorLanguage::Python,
+            traceId: (string) Str::uuid(),
+            publishedAt: Carbon::parse('2026-08-15T14:00:01Z'),
+        );
+    }
+
+    private function vulJob(): VulnScannerJob
+    {
+        return new VulnScannerJob(
+            analysisSubmissionId: 501,
+            submissionId: 101,
+            fileUrl: 'https://minio.test/a?sig=1',
+            language: CodeqlLanguage::Cpp,
+            traceId: (string) Str::uuid(),
+            publishedAt: Carbon::parse('2026-08-15T14:00:01Z'),
+        );
     }
 
     private function simJob(): PlagiarismCheckerJob
