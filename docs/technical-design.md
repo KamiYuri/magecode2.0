@@ -600,6 +600,13 @@ Pairwise similarity from SIM (Dolos). Written by **api** from `result-analysis` 
 
 ## 8. RabbitMQ Message Schemas
 
+> **SUPERSEDED (2026-08-18)** — the payloads below are the Phase 1 drafts and no longer match what
+> the services send. `shared/schemas/*.json` is the source of truth (session-guide §1) and
+> `docs/rabbitmq-schemas.md` its prose form; both outrank this section. Concretely: the SIM job
+> now splits by language (`language`, `language_group_index`, `language_group_total`) and carries a
+> single `submissions` array — the `compared_submissions` field in §8.2.2 does not exist. Kept as a
+> historical record of the design, like the superseded entries in decisions-v1.
+
 All messages use JSON format with persistent delivery mode. Service identifiers use string enum (D-26): `"code-executor"`, `"plagiarism-checker"`, `"ai-detector"`, `"vuln-scanner"`. All messages include `trace_id` for cross-service tracing (D-88).
 
 ### 8.1. Queue Map (6 Queues per D-83)

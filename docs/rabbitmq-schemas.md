@@ -4,7 +4,11 @@
 > **Authors**: Gideon & Claude (Anthropic)
 > **Status**: Phase 1 Deliverable — Final
 > **Supersedes**: Technical Design Phase 1, Section 8 (outdated after D-80–D-89)
-> **AMQP Client**: [`bschmitt/laravel-amqp`](https://github.com/bschmitt/laravel-amqp) v3.1 — standalone AMQP publish/consume (not a queue driver)
+> **AMQP Client (api)**: [`php-amqplib`](https://github.com/php-amqplib/php-amqplib) — standalone
+> AMQP publish/consume, not a queue driver. `bschmitt/laravel-amqp` was dropped in C3: it always
+> declares an exchange and binds to it, which AMQP forbids for the default exchange this topology
+> uses, and its default `x-max-length => 1` would have collided with the Go workers' argument-free
+> declare (v3 §7, 2026-08-14). Workers use `shared/go/rmq`.
 
 ---
 
