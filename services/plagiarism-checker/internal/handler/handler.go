@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/magecode/plagiarism-checker/internal/dolos"
-	"github.com/magecode/plagiarism-checker/internal/downloader"
+	"github.com/magecode/shared/go/httpsource"
 	"github.com/magecode/plagiarism-checker/internal/job"
 	"github.com/magecode/plagiarism-checker/internal/result"
 	"github.com/magecode/plagiarism-checker/internal/workspace"
@@ -32,7 +32,7 @@ type Comparer interface {
 
 // Config wires one handler.
 type Config struct {
-	Sources       *downloader.Client
+	Sources       *httpsource.Client
 	Comparer      Comparer
 	Publisher     Publisher
 	WorkspaceRoot string
@@ -41,7 +41,7 @@ type Config struct {
 
 // Handler processes one SIM job end to end.
 type Handler struct {
-	sources       *downloader.Client
+	sources       *httpsource.Client
 	comparer      Comparer
 	publisher     Publisher
 	workspaceRoot string

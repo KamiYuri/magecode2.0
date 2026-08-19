@@ -6,7 +6,7 @@ import (
 	"context"
 	"sync"
 
-	"github.com/magecode/plagiarism-checker/internal/downloader"
+	"github.com/magecode/shared/go/httpsource"
 	"github.com/magecode/plagiarism-checker/internal/job"
 	"github.com/magecode/plagiarism-checker/internal/workspace"
 )
@@ -30,7 +30,7 @@ type Fetched struct {
 // A failure is recorded against its own submission and the rest continue: the
 // result message carries a per-submission status, so one expired URL costs the
 // group one file rather than every comparison in it.
-func Fetch(ctx context.Context, ws *workspace.Workspace, client *downloader.Client, j job.Similarity) []Fetched {
+func Fetch(ctx context.Context, ws *workspace.Workspace, client *httpsource.Client, j job.Similarity) []Fetched {
 	results := make([]Fetched, len(j.Submissions))
 	extension := j.Language.Extension()
 

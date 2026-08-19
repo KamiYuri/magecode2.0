@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/magecode/plagiarism-checker/internal/downloader"
+	"github.com/magecode/shared/go/httpsource"
 	"github.com/magecode/plagiarism-checker/internal/job"
 	"github.com/magecode/plagiarism-checker/internal/workspace"
 )
@@ -33,8 +33,8 @@ func fixtureJob(urls ...string) job.Similarity {
 	}
 }
 
-func testDownloader() *downloader.Client {
-	return downloader.New(downloader.Config{
+func testDownloader() *httpsource.Client {
+	return httpsource.New(httpsource.Config{
 		MaxBytes: 64 * 1024, Attempts: 2, BaseDelay: time.Millisecond, Timeout: 2 * time.Second,
 	})
 }

@@ -22,7 +22,9 @@ No `db` package — D-80 forbids DB access.
 ## Key Files
 - `cmd/main.go` — entrypoint: signal handling, config load, consume loop, workspace lifecycle
 - `internal/job` — strict decode of `job.plagiarism-checker.v1`; every rejection Permanent
-- `internal/downloader` — pre-signed URL GET with a retry budget; 4xx Permanent, 5xx Transient
+- source downloads live in `shared/go/httpsource` — VUL needs the same classification rules
+  (4xx Permanent, 5xx Transient) and they are exactly the kind of thing that drifts when
+  written twice
 - `internal/workspace` — the per-job temp directory; files are named `{submission_id}.{ext}`,
   which is the only identity a file carries through Dolos
 - `internal/dolos` — runs `reporter/report.mjs` and parses it into ordered pairs; owns the

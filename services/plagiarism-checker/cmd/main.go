@@ -14,7 +14,7 @@ import (
 	"syscall"
 
 	"github.com/magecode/plagiarism-checker/internal/dolos"
-	"github.com/magecode/plagiarism-checker/internal/downloader"
+	"github.com/magecode/shared/go/httpsource"
 	"github.com/magecode/plagiarism-checker/internal/handler"
 	"github.com/magecode/plagiarism-checker/internal/job"
 	"github.com/magecode/shared/go/config"
@@ -80,7 +80,7 @@ func main() {
 	}
 	defer func() { _ = consumer.Close() }()
 
-	sources := downloader.New(downloader.Config{
+	sources := httpsource.New(httpsource.Config{
 		MaxBytes: int64(cfg.Int("MAX_SOURCE_BYTES")),
 		Attempts: 3,
 	})

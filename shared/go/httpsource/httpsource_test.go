@@ -1,4 +1,4 @@
-package downloader
+package httpsource
 
 import (
 	"context"
@@ -12,7 +12,7 @@ import (
 	"github.com/magecode/shared/go/apperror"
 )
 
-func testClient(server *httptest.Server) *Client {
+func testClient(_ *httptest.Server) *Client {
 	return New(Config{
 		MaxBytes: 64 * 1024,
 		Attempts: 3,
