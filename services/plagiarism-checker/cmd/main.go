@@ -15,6 +15,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/magecode/plagiarism-checker/internal/dolos"
 	"github.com/magecode/plagiarism-checker/internal/downloader"
 	"github.com/magecode/plagiarism-checker/internal/handler"
 	"github.com/magecode/plagiarism-checker/internal/job"
@@ -43,6 +44,12 @@ const (
 	// defaultWorkspaceRoot is tmpfs in compose, so the sources of a batch
 	// never touch a disk.
 	defaultWorkspaceRoot = "/tmp"
+	// defaultReporterScript is where the image puts the Node reporter that
+	// drives the Dolos library (reporter/report.mjs).
+	defaultReporterScript = "/app/reporter/report.mjs"
+	// defaultMaxRegions bounds one pair's highlight list. Regions land in a
+	// TEXT column and a long pair of files can produce hundreds.
+	defaultMaxRegions = "100"
 )
 
 func main() {
@@ -51,11 +58,14 @@ func main() {
 	defer stop()
 
 	cfg, err := config.Load(config.Spec{
-		"RABBITMQ_URL":     {Required: true},
-		"RMQ_PREFETCH":     {Type: config.Int, Default: defaultPrefetch},
-		"DOLOS_TIMEOUT":    {Type: config.Duration, Default: defaultDolosTimeout},
-		"MAX_SOURCE_BYTES": {Type: config.Int, Default: defaultMaxSourceBytes},
-		"WORKSPACE_ROOT":   {Default: defaultWorkspaceRoot},
+		"RABBITMQ_URL":         {Required: true},
+		"RMQ_PREFETCH":         {Type: config.Int, Default: defaultPrefetch},
+		"DOLOS_TIMEOUT":        {Type: config.Duration, Default: defaultDolosTimeout},
+		"MAX_SOURCE_BYTES":     {Type: config.Int, Default: defaultMaxSourceBytes},
+		"WORKSPACE_ROOT":       {Default: defaultWorkspaceRoot},
+		"REPORTER_SCRIPT":      {Default: defaultReporterScript},
+		"NODE_BIN":             {Default: "node"},
+		"MAX_REGIONS_PER_PAIR": {Type: config.Int, Default: defaultMaxRegions},
 	})
 	if err != nil {
 		log.Error("loading config", logger.Err(err))
@@ -78,12 +88,19 @@ func main() {
 		Attempts: 3,
 	})
 
+	comparer := dolos.New(dolos.Config{
+		Node:    cfg.String("NODE_BIN"),
+		Script:  cfg.String("REPORTER_SCRIPT"),
+		Timeout: cfg.Duration("DOLOS_TIMEOUT"),
+		Limits:  dolos.Limits{MaxRegionsPerPair: cfg.Int("MAX_REGIONS_PER_PAIR")},
+	})
+
 	log.Info("worker started", "data", map[string]any{
 		"queue":    serviceName,
 		"prefetch": cfg.Int("RMQ_PREFETCH"),
 	})
 
-	err = consumer.Consume(ctx, serviceName, compare(log, sources, cfg.String("WORKSPACE_ROOT")))
+	err = consumer.Consume(ctx, serviceName, compare(log, sources, comparer, cfg.String("WORKSPACE_ROOT")))
 	if err != nil {
 		log.Error("consumer stopped", logger.Err(err))
 		os.Exit(1)
@@ -98,7 +115,7 @@ func main() {
 // (D-79e). Decoding failures are Permanent because a body SIM cannot read is
 // one it also cannot answer — there is no analysis_submission_id in it to
 // report an error against.
-func compare(log *slog.Logger, sources *downloader.Client, workspaceRoot string) rmq.Handler {
+func compare(log *slog.Logger, sources *downloader.Client, comparer *dolos.Runner, workspaceRoot string) rmq.Handler {
 	return func(ctx context.Context, d rmq.Delivery) error {
 		decoded, err := job.Decode(d.Body)
 		if err != nil {
@@ -154,6 +171,31 @@ func compare(log *slog.Logger, sources *downloader.Client, workspaceRoot string)
 			"downloaded":          downloaded,
 			"failed":              len(fetched) - downloaded,
 			"duration_ms":         time.Since(started).Milliseconds(),
+		})
+
+		// Fewer than two readable files is not a comparison. api marks such
+		// groups not_applicable before publishing, so reaching this means
+		// downloads failed — which E3 reports as a per-submission error.
+		if downloaded < 2 {
+			log.Warn("too few sources to compare", "trace_id", decoded.TraceID, "data", map[string]any{
+				"analysis_problem_id": decoded.AnalysisProblemID,
+				"downloaded":          downloaded,
+			})
+			return nil
+		}
+
+		pairs, err := comparer.Compare(ctx, ws.Dir(), decoded.Language)
+		if err != nil {
+			log.Error("comparison failed", logger.Err(err), "trace_id", decoded.TraceID,
+				"data", map[string]any{"analysis_problem_id": decoded.AnalysisProblemID})
+			return err
+		}
+
+		log.Info("language group compared", "trace_id", decoded.TraceID, "data", map[string]any{
+			"analysis_problem_id":  decoded.AnalysisProblemID,
+			"language_group_index": decoded.LanguageGroupIndex,
+			"pairs":                len(pairs),
+			"duration_ms":          time.Since(started).Milliseconds(),
 		})
 
 		return nil

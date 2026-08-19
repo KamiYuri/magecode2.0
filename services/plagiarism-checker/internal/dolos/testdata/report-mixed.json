@@ -1,0 +1,32 @@
+{
+  "version": "1.0",
+  "language": "python",
+  "files": [
+    { "path": "/tmp/sim-x/12.py" },
+    { "path": "/tmp/sim-x/9.py" },
+    { "path": "/tmp/sim-x/30.py" }
+  ],
+  "pairs": [
+    {
+      "leftPath": "/tmp/sim-x/12.py",
+      "rightPath": "/tmp/sim-x/9.py",
+      "similarity": 0.8125,
+      "longestFragment": 14,
+      "totalOverlap": 28,
+      "fragments": [
+        { "left": { "startRow": 0, "startCol": 0, "endRow": 3, "endCol": 12 },
+          "right": { "startRow": 4, "startCol": 2, "endRow": 7, "endCol": 20 } },
+        { "left": { "startRow": 10, "startCol": 0, "endRow": 11, "endCol": 5 },
+          "right": { "startRow": 12, "startCol": 1, "endRow": 13, "endCol": 6 } }
+      ]
+    },
+    {
+      "leftPath": "/tmp/sim-x/9.py",
+      "rightPath": "/tmp/sim-x/30.py",
+      "similarity": 0.05,
+      "longestFragment": 3,
+      "totalOverlap": 4,
+      "fragments": []
+    }
+  ]
+}
