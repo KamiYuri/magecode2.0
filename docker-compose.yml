@@ -67,9 +67,17 @@ services:
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
       MINIO_BUCKET: ${MINIO_BUCKET}
       MINIO_PRESIGNED_URL_TTL: ${MINIO_PRESIGNED_URL_TTL:-21600}
+      # Without this, config('broadcasting.default') falls through to `null`
+      # — and the null broadcaster does not merely drop events, it makes
+      # /broadcasting/auth answer 200 to every channel for every user. Found
+      # by E9: a student authorised another student's submission channel.
+      BROADCAST_CONNECTION: reverb
       REVERB_APP_ID: ${REVERB_APP_ID:-magecode}
       REVERB_APP_KEY: ${REVERB_APP_KEY}
       REVERB_APP_SECRET: ${REVERB_APP_SECRET}
+      REVERB_HOST: reverb
+      REVERB_PORT: 8080
+      REVERB_SCHEME: http
       SANCTUM_STATEFUL_DOMAINS: ${APP_DOMAIN:-localhost}
     networks:
       - frontend
@@ -133,6 +141,7 @@ services:
       DB_DATABASE: ${POSTGRES_DB}
       DB_USERNAME: ${POSTGRES_USER}
       DB_PASSWORD: ${POSTGRES_PASSWORD}
+      BROADCAST_CONNECTION: reverb
       REVERB_APP_ID: ${REVERB_APP_ID:-magecode}
       REVERB_APP_KEY: ${REVERB_APP_KEY}
       REVERB_APP_SECRET: ${REVERB_APP_SECRET}
@@ -374,7 +383,9 @@ services:
     deploy:
       resources:
         limits:
-          memory: 2G
+          # 2G left CodeQL a 1386MB heap, which it reports as too small to
+          # cache query stages; the suite still runs but recompiles constantly.
+          memory: ${VUL_MEMORY_LIMIT:-4G}
     networks:
       - backend
     depends_on:

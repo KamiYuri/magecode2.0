@@ -40,6 +40,17 @@ RUN apt-get update \
 COPY --from=builder /out/worker /usr/local/bin/worker
 COPY --from=codeql /opt/codeql /opt/codeql
 
+# Two ownership problems, both found by running the container rather than by
+# building it (E9):
+#   * the bundle's precompiled .qlx files arrive unreadable to a non-root
+#     user, so every query is recompiled and some fail outright;
+#   * CodeQL writes a compile cache under $HOME/.codeql, and a named volume
+#     mounted there inherits ownership from this path — root-owned here means
+#     "Could not create cache dir" on every scan.
+RUN chmod -R a+rX /opt/codeql \
+    && mkdir -p /home/magecode/.codeql \
+    && chown -R magecode:magecode /home/magecode
+
 ENV PATH="/opt/codeql:${PATH}" \
     CODEQL_BIN=/opt/codeql/codeql \
     HEALTH_ADDR=:9090
