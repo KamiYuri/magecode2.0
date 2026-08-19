@@ -6,8 +6,14 @@ Stateless batch worker (D-80: no DB access). Consumes `plagiarism-checker` jobs
 runs Dolos similarity analysis, publishes full results to `result-analysis`.
 
 ## Status
-E1 + E2 done: job decode, downloads into a temp workspace, and the Dolos comparison.
-E3 (result assembly + publish to `result-analysis`) still to come.
+Plan E complete for SIM (E1–E3): job decode, downloads, Dolos comparison and the
+`result-analysis` message. Images and compose wiring belong to E8.
+
+**The rule this service follows is that SIM always answers.** A failure it can describe —
+an unreadable source, a comparison that timed out — is published as `status: error` and
+acked, because api is waiting on the message and a dead-letter costs the batch D-82's full
+30-minute timeout. Only an undecodable body (it names no submission to report against) and
+an unreachable broker are not answered.
 
 ## Tech Stack
 Go 1.26+, shared packages from `shared/go` (logger, config, apperror, rmq).
@@ -25,7 +31,10 @@ No `db` package — D-80 forbids DB access.
   `dolos` CLI's CSV export has no fragment coordinates** and `a_regions`/`b_regions` are
   exactly those coordinates (v3 §7, 2026-08-19). Its native modules are built for the
   image's Node ABI, so run it through the image rather than a host node
-- `internal/handler` — per-job orchestration; one failed download costs its own submission only
+- `internal/result` — the `result.analysis.v1` SIM branch; nullable metrics are pointers so
+  "not measured" encodes as null rather than 0. Validated against the schema file itself
+- `internal/handler` — per-job orchestration and the always-answer rule; one failed download
+  costs its own submission only
 - `Dockerfile` — multi-stage build, context = monorepo root (D-79a)
 
 ## Env Vars
