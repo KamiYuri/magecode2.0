@@ -1,4 +1,5 @@
-.PHONY: up down logs seed reset status up-app up-analysis up-full up-judge0 up-all dev-api dev-web dev-reverb migrate fresh logs-all backup judge0-health
+.PHONY: up down logs seed reset status up-app up-analysis up-full up-judge0 up-all dev-api dev-web dev-reverb migrate fresh logs-all backup judge0-health \
+	test-go test-aid lint-aid build-workers aid-venv reporter-deps
 
 # ── Infrastructure ──
 up:  ## Dev: infrastructure only (postgres, rabbitmq, minio, loki, etc.)
@@ -79,6 +80,36 @@ lint-api: api-image
 
 composer-api: api-image
 	$(API_RUN) composer $(args)
+
+# ── Workers ──
+# The Go worker suites. Integration suites need the compose stack and their own
+# env var (see docs/progress.md); this target is the fast loop.
+test-go:
+	cd shared/go && go test ./...
+	cd services/code-executor && go test ./...
+	cd services/plagiarism-checker && go test ./...
+	cd services/vuln-scanner && go test ./...
+
+# AID's fast loop deliberately excludes torch/transformers (requirements-dev.txt),
+# so `-m slow` and the image are the only places the real weights load.
+aid-venv:
+	test -d services/ai-detector/.venv || python3 -m venv services/ai-detector/.venv
+	services/ai-detector/.venv/bin/pip -q install -r services/ai-detector/requirements-dev.txt
+
+test-aid: aid-venv
+	cd services/ai-detector && .venv/bin/python -m pytest
+
+lint-aid: aid-venv
+	cd services/ai-detector && .venv/bin/python -m ruff check src tests
+
+# The reporter's native tree-sitter modules are built for the image's Node ABI,
+# which is why this runs in a container rather than against the host's node.
+reporter-deps:
+	docker run --rm -u "$$(id -u):$$(id -g)" -e HOME=/tmp \
+		-v $(PWD)/services/plagiarism-checker/reporter:/w -w /w node:22 npm ci
+
+build-workers:
+	docker compose --profile analysis build
 
 # ── Database ──
 # Run through the api image against PgBouncer: the host PHP has no pdo_pgsql.

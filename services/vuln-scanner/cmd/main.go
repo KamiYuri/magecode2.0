@@ -13,6 +13,7 @@ import (
 	"syscall"
 
 	"github.com/magecode/shared/go/config"
+	"github.com/magecode/shared/go/health"
 	"github.com/magecode/shared/go/httpsource"
 	"github.com/magecode/shared/go/logger"
 	"github.com/magecode/shared/go/rmq"
@@ -36,6 +37,9 @@ const (
 	// defaultMaxSourceBytes leaves headroom over D-34's 50KB cap; the point
 	// is to refuse something that is not a submission at all.
 	defaultMaxSourceBytes = "1048576"
+	// defaultHealthAddr is where compose's healthcheck asks (D-72) and where
+	// G1 will hang /metrics.
+	defaultHealthAddr = ":9090"
 	// defaultWorkspaceRoot is tmpfs in compose: a CodeQL database is the
 	// larger half of what a scan writes, and none of it should reach a disk.
 	defaultWorkspaceRoot = "/tmp"
@@ -54,6 +58,7 @@ func main() {
 		"CODEQL_THREADS":   {Default: defaultThreads},
 		"MAX_SOURCE_BYTES": {Type: config.Int, Default: defaultMaxSourceBytes},
 		"WORKSPACE_ROOT":   {Default: defaultWorkspaceRoot},
+		"HEALTH_ADDR":      {Default: defaultHealthAddr},
 	})
 	if err != nil {
 		log.Error("loading config", logger.Err(err))
@@ -94,6 +99,16 @@ func main() {
 		Publisher: publisher,
 		Log:       log,
 	})
+
+	// Readiness is the broker: a worker whose connection died still has a
+	// process, and without this the container looks fine while consuming
+	// nothing.
+	liveness := health.New(cfg.String("HEALTH_ADDR"), consumer.Healthy, log)
+	if err := liveness.Start(ctx); err != nil {
+		log.Error("starting health server", logger.Err(err))
+		os.Exit(1)
+	}
+	defer liveness.Stop()
 
 	log.Info("worker started", "data", map[string]any{
 		"queue":    serviceName,

@@ -148,6 +148,87 @@ services:
     logging:
       <<: *loki-logging
 
+  # ── api background processes ──────────────────────────────────────────────
+  #
+  # The api container serves HTTP through FPM and nothing else. These three
+  # long-running processes use the same image and were missing until E8:
+  # without the two consumers, CES and the analysis workers publish results
+  # into queues nobody reads, and without the scheduler D7's timeout sweeper
+  # (registered in routes/console.php) never fires in a deployment.
+
+  amqp-execution-consumer: &api-worker
+    profiles: ["app", "full"]
+    build:
+      context: ./services/api
+      dockerfile: Dockerfile
+      target: api
+    container_name: magecode-amqp-execution-consumer
+    labels:
+      - service=amqp-execution-consumer
+    command: ["php", "artisan", "amqp:consume-execution"]
+    environment: &api-worker-env
+      <<: *common-env
+      APP_ENV: ${APP_ENV}
+      APP_KEY: ${APP_KEY}
+      APP_DEBUG: ${APP_DEBUG:-true}
+      APP_URL: ${APP_URL}
+      DB_CONNECTION: pgsql
+      DB_HOST: pgbouncer
+      DB_PORT: ${PGBOUNCER_PORT}
+      DB_DATABASE: ${POSTGRES_DB}
+      DB_USERNAME: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      QUEUE_CONNECTION: database
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_DEFAULT_USER}
+      RABBITMQ_PASSWORD: ${RABBITMQ_DEFAULT_PASS}
+      RABBITMQ_VHOST: ${RABBITMQ_DEFAULT_VHOST}
+      FILESYSTEM_DISK: minio
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      MINIO_BUCKET: ${MINIO_BUCKET}
+      MINIO_PRESIGNED_URL_TTL: ${MINIO_PRESIGNED_URL_TTL:-21600}
+      # Broadcasting a result instantiates the broadcaster, so these are
+      # required even though the process serves no WebSocket itself.
+      BROADCAST_CONNECTION: reverb
+      REVERB_APP_ID: ${REVERB_APP_ID:-magecode}
+      REVERB_APP_KEY: ${REVERB_APP_KEY}
+      REVERB_APP_SECRET: ${REVERB_APP_SECRET}
+      REVERB_HOST: reverb
+      REVERB_PORT: 8080
+      REVERB_SCHEME: http
+    networks:
+      - backend
+    depends_on:
+      pgbouncer:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+    logging:
+      <<: *loki-logging
+
+  amqp-analysis-consumer:
+    <<: *api-worker
+    container_name: magecode-amqp-analysis-consumer
+    labels:
+      - service=amqp-analysis-consumer
+    command: ["php", "artisan", "amqp:consume-analysis"]
+    environment:
+      <<: *api-worker-env
+
+  scheduler:
+    <<: *api-worker
+    container_name: magecode-scheduler
+    labels:
+      - service=scheduler
+    # schedule:work is the long-running form; the api image has no cron.
+    command: ["php", "artisan", "schedule:work"]
+    environment:
+      <<: *api-worker-env
+
   code-executor:
     profiles: ["app", "full"]
     build:
@@ -197,13 +278,27 @@ services:
     profiles: ["analysis", "full"]
     environment:
       <<: *common-env
+      # Stateless — NO DB_* vars (D-80)
       RABBITMQ_URL: "amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@rabbitmq:5672/${RABBITMQ_DEFAULT_VHOST}"
-      DOLOS_TIMEOUT: ${SIM_DOLOS_TIMEOUT:-300}
+      RMQ_PREFETCH: ${SIM_PREFETCH:-1}
+      DOLOS_TIMEOUT: ${SIM_DOLOS_TIMEOUT:-300s}
+      MAX_REGIONS_PER_PAIR: ${SIM_MAX_REGIONS_PER_PAIR:-100}
+      HEALTH_ADDR: ":9090"
+    tmpfs:
+      # A language group's sources, downloaded per job and removed when it
+      # settles. Never a disk.
+      - /tmp:size=256m
     networks:
       - backend
     depends_on:
       rabbitmq:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:9090/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
     restart: unless-stopped
     logging:
       <<: *loki-logging
@@ -219,9 +314,16 @@ services:
     environment:
       <<: *common-env
       RABBITMQ_URL: "amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@rabbitmq:5672/${RABBITMQ_DEFAULT_VHOST}"
-      MODEL_NAME: ${AID_MODEL_NAME:-microsoft/codebert-base}
+      RMQ_PREFETCH: ${AID_PREFETCH:-3}
+      # -mlm, not plain codebert-base: that release carries no trained head of
+      # any kind and scored two fixtures 1e-13 apart (v3 §7, 2026-08-19).
+      MODEL_NAME: ${AID_MODEL_NAME:-microsoft/codebert-base-mlm}
       BATCH_SIZE: ${AID_BATCH_SIZE:-8}
       DEVICE: ${AID_DEVICE:-cpu}
+      HF_HOME: /app/models
+      AID_CALIBRATION_MEAN: ${AID_CALIBRATION_MEAN:-1.40}
+      AID_CALIBRATION_SCALE: ${AID_CALIBRATION_SCALE:-0.15}
+      HEALTH_PORT: 9090
     volumes:
       - model-cache:/app/models
     tmpfs:
@@ -235,6 +337,14 @@ services:
     depends_on:
       rabbitmq:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:9090/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      # Loading the checkpoint (and downloading it on a cold cache) happens
+      # before the consumer starts.
+      start_period: 180s
     restart: unless-stopped
     logging:
       <<: *loki-logging
@@ -250,11 +360,17 @@ services:
     environment:
       <<: *common-env
       RABBITMQ_URL: "amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@rabbitmq:5672/${RABBITMQ_DEFAULT_VHOST}"
-      CODEQL_TIMEOUT: ${VUL_CODEQL_TIMEOUT:-600}
+      RMQ_PREFETCH: ${VUL_PREFETCH:-3}
+      CODEQL_TIMEOUT: ${VUL_CODEQL_TIMEOUT:-600s}
+      CODEQL_THREADS: ${VUL_CODEQL_THREADS:-2}
+      HEALTH_ADDR: ":9090"
     volumes:
-      - codeql-cache:/home/codeql/.codeql
+      # The image runs as `magecode`, so the pack cache is under that home —
+      # the previous path belonged to a user this image does not have.
+      - codeql-cache:/home/magecode/.codeql
     tmpfs:
-      - /tmp:size=512m
+      # A CodeQL database is the larger half of what a scan writes.
+      - /tmp:size=1g
     deploy:
       resources:
         limits:
@@ -264,6 +380,12 @@ services:
     depends_on:
       rabbitmq:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:9090/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
     restart: unless-stopped
     logging:
       <<: *loki-logging

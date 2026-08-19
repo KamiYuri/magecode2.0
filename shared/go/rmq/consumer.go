@@ -219,6 +219,9 @@ func (c *consumer) publishCopy(ch *amqp.Channel, target string, msg amqp.Deliver
 	return nil
 }
 
+// Healthy implements Consumer.
+func (c *consumer) Healthy() bool { return c.conn.healthy() }
+
 func (c *consumer) Close() error {
 	err := c.conn.close()
 	if err != nil && !errors.Is(err, amqp.ErrClosed) {

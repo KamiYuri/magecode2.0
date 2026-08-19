@@ -13,6 +13,7 @@ import sys
 from src.config import BOOL, FLOAT, INT, ConfigError, Field, load
 from src.downloader import Downloader
 from src.handler import Handler
+from src.health import serve as serve_health
 from src.job import QUEUE_NAME
 from src.log import configure
 from src.model import (
@@ -47,6 +48,8 @@ SPEC = {
     # Loading the checkpoint takes seconds; doing it before the first message
     # means the first student scored does not wait for it.
     "WARM_MODEL": Field(type=BOOL, default="true"),
+    # D-72: compose asks here. G1 will hang /metrics on the same server.
+    "HEALTH_PORT": Field(type=INT, default="9090"),
 }
 
 
@@ -114,6 +117,10 @@ def main() -> int:
             broker.close()
             return 1
 
+    # Readiness is the broker: pika's blocking connection knows whether it is
+    # still open, and a worker that has lost it must not look healthy.
+    health = serve_health(lambda: broker.connection.is_open, ("0.0.0.0", cfg["HEALTH_PORT"]))
+
     handler = Handler(
         downloader=Downloader(max_bytes=cfg["MAX_SOURCE_BYTES"]),
         detector=detector,
@@ -145,6 +152,8 @@ def main() -> int:
     try:
         consume(broker.channel, QUEUE_NAME, handler.handle, shutdown, on_failure=report)
     finally:
+        health.shutdown()
+        health.server_close()
         broker.close()
 
     logger.info("shutdown complete")

@@ -61,6 +61,15 @@ func (c *connection) channel(ctx context.Context) (*amqp.Channel, error) {
 	}
 }
 
+// healthy reports whether the connection is currently usable. It never
+// dials: it answers what is true now, which is what a liveness probe is
+// asking (D-72).
+func (c *connection) healthy() bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.conn != nil && !c.conn.IsClosed()
+}
+
 func (c *connection) close() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
