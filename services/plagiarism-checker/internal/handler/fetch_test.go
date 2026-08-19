@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/magecode/shared/go/httpsource"
 	"github.com/magecode/plagiarism-checker/internal/job"
 	"github.com/magecode/plagiarism-checker/internal/workspace"
+	"github.com/magecode/shared/go/httpsource"
 )
 
 func fixtureJob(urls ...string) job.Similarity {

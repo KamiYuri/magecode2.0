@@ -6,11 +6,11 @@ import (
 	"time"
 
 	"github.com/magecode/plagiarism-checker/internal/dolos"
-	"github.com/magecode/shared/go/httpsource"
 	"github.com/magecode/plagiarism-checker/internal/job"
 	"github.com/magecode/plagiarism-checker/internal/result"
 	"github.com/magecode/plagiarism-checker/internal/workspace"
 	"github.com/magecode/shared/go/apperror"
+	"github.com/magecode/shared/go/httpsource"
 	"github.com/magecode/shared/go/logger"
 	"github.com/magecode/shared/go/rmq"
 )

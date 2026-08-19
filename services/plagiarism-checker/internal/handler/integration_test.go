@@ -25,10 +25,10 @@ import (
 
 	amqp "github.com/rabbitmq/amqp091-go"
 
-	"github.com/magecode/shared/go/httpsource"
 	"github.com/magecode/plagiarism-checker/internal/handler"
 	"github.com/magecode/plagiarism-checker/internal/job"
 	"github.com/magecode/plagiarism-checker/internal/workspace"
+	"github.com/magecode/shared/go/httpsource"
 	"github.com/magecode/shared/go/rmq"
 )
 

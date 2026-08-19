@@ -6,9 +6,9 @@ import (
 	"context"
 	"sync"
 
-	"github.com/magecode/shared/go/httpsource"
 	"github.com/magecode/plagiarism-checker/internal/job"
 	"github.com/magecode/plagiarism-checker/internal/workspace"
+	"github.com/magecode/shared/go/httpsource"
 )
 
 // maxParallelDownloads bounds how many pre-signed URLs are in flight at once.
