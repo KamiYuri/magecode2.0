@@ -82,7 +82,7 @@ profile + notifications — and B10, which M5 owns, stay open.)
 |---|---|---|---|---|
 | E1 sim skeleton + downloads | P0 | done | `sim/feat/skeleton-downloads` | Files are named `{submission_id}.{ext}` and `workspace.SubmissionIDFromPath` reads them back — that name is the **only** identity a file carries through Dolos, so E2 must not rename. One failed download costs its own submission, not the group (`handler.Fetch`) |
 | E2 dolos wrapper + parsing | P0 | done | `sim/feat/dolos-wrapper` | **The CLI cannot produce regions** — SIM drives `@dodona/dolos-lib` through `reporter/report.mjs` (v3 §7). Regions are **1-based** on the wire, converted once in `internal/dolos`; Dolos itself is 0-based. Pairs with zero overlap are dropped, or a 150-submission group would store ~11k rows of 0.0 |
-| E3 sim result assembly | P0 | todo | — | — |
+| E3 sim result assembly | P0 | done | `sim/feat/result-publish` | **SIM always answers**: a failed comparison publishes `status: error` and acks — a dead-letter would leave the batch to D-82's 30-min timeout for an answer SIM already has. Only an undecodable body (no submission to answer for) dead-letters; only a broker failure retries. Payloads are validated against `shared/schemas/result.analysis.v1.schema.json` itself, error paths included |
 | E4 aid consumer | P0 | todo | — | — |
 | E5 aid codebert inference | P0 | todo | — | — |
 | E6 aid result publish | P0 | todo | — | — |

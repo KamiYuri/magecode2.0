@@ -3,23 +3,20 @@
 // with Dolos, then publishes the whole result to api (D-80 — SIM holds no
 // database).
 //
-// This file owns the loop and its failure semantics. The comparison itself
-// lands in E2 and the result message in E3.
+// This file owns the wiring; `internal/handler` owns what one job does and
+// what its failures mean.
 package main
 
 import (
 	"context"
-	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/magecode/plagiarism-checker/internal/dolos"
 	"github.com/magecode/plagiarism-checker/internal/downloader"
 	"github.com/magecode/plagiarism-checker/internal/handler"
 	"github.com/magecode/plagiarism-checker/internal/job"
-	"github.com/magecode/plagiarism-checker/internal/workspace"
 	"github.com/magecode/shared/go/config"
 	"github.com/magecode/shared/go/logger"
 	"github.com/magecode/shared/go/rmq"
@@ -95,109 +92,32 @@ func main() {
 		Limits:  dolos.Limits{MaxRegionsPerPair: cfg.Int("MAX_REGIONS_PER_PAIR")},
 	})
 
+	// A separate connection from the consumer's: a publisher sharing the
+	// delivery channel would serialise results behind comparisons.
+	publisher, err := rmq.NewPublisher(ctx, rmq.Config{URL: cfg.String("RABBITMQ_URL"), Logger: log})
+	if err != nil {
+		log.Error("opening result publisher", logger.Err(err))
+		os.Exit(1)
+	}
+	defer func() { _ = publisher.Close() }()
+
+	jobs := handler.New(handler.Config{
+		Sources:       sources,
+		Comparer:      comparer,
+		Publisher:     publisher,
+		WorkspaceRoot: cfg.String("WORKSPACE_ROOT"),
+		Log:           log,
+	})
+
 	log.Info("worker started", "data", map[string]any{
 		"queue":    serviceName,
 		"prefetch": cfg.Int("RMQ_PREFETCH"),
 	})
 
-	err = consumer.Consume(ctx, serviceName, compare(log, sources, comparer, cfg.String("WORKSPACE_ROOT")))
+	err = consumer.Consume(ctx, serviceName, jobs.Handle)
 	if err != nil {
 		log.Error("consumer stopped", logger.Err(err))
 		os.Exit(1)
 	}
 	log.Info("shutdown complete")
-}
-
-// compare returns the delivery handler.
-//
-// What it returns decides the message's fate: nil acks, a Permanent error
-// dead-letters immediately, and anything else is retried up to the budget
-// (D-79e). Decoding failures are Permanent because a body SIM cannot read is
-// one it also cannot answer — there is no analysis_submission_id in it to
-// report an error against.
-func compare(log *slog.Logger, sources *downloader.Client, comparer *dolos.Runner, workspaceRoot string) rmq.Handler {
-	return func(ctx context.Context, d rmq.Delivery) error {
-		decoded, err := job.Decode(d.Body)
-		if err != nil {
-			// d.TraceID rather than the body's: an undecodable body may not
-			// have one, and the header is what the publisher set (D-88).
-			log.Error("rejecting unreadable job", logger.Err(err), "trace_id", d.TraceID,
-				"data", map[string]any{"queue": d.Queue, "bytes": len(d.Body)})
-			return err
-		}
-
-		log.Info("comparing language group", "trace_id", decoded.TraceID, "data", map[string]any{
-			"analysis_problem_id":  decoded.AnalysisProblemID,
-			"language":             string(decoded.Language),
-			"language_group_index": decoded.LanguageGroupIndex,
-			"language_group_total": decoded.LanguageGroupTotal,
-			"submissions":          len(decoded.Submissions),
-			"retry_count":          d.RetryCount,
-		})
-
-		ws, err := workspace.New(workspaceRoot)
-		if err != nil {
-			log.Error("creating workspace", logger.Err(err), "trace_id", decoded.TraceID)
-			return err
-		}
-		// The workspace goes whether the job succeeded or not: it holds
-		// student source, and a container that keeps it fills its tmpfs by
-		// the end of an assessment week.
-		defer func() {
-			if err := ws.Close(); err != nil {
-				log.Warn("removing workspace", logger.Err(err), "trace_id", decoded.TraceID,
-					"data", map[string]any{"dir": ws.Dir()})
-			}
-		}()
-
-		started := time.Now()
-		fetched := handler.Fetch(ctx, ws, sources, decoded)
-
-		downloaded := 0
-		for _, result := range fetched {
-			if result.Err != nil {
-				log.Warn("source unavailable", logger.Err(result.Err), "trace_id", decoded.TraceID,
-					"data", map[string]any{
-						"submission_id":          result.Submission.SubmissionID,
-						"analysis_submission_id": result.Submission.AnalysisSubmissionID,
-					})
-				continue
-			}
-			downloaded++
-		}
-
-		log.Info("sources ready", "trace_id", decoded.TraceID, "data", map[string]any{
-			"analysis_problem_id": decoded.AnalysisProblemID,
-			"downloaded":          downloaded,
-			"failed":              len(fetched) - downloaded,
-			"duration_ms":         time.Since(started).Milliseconds(),
-		})
-
-		// Fewer than two readable files is not a comparison. api marks such
-		// groups not_applicable before publishing, so reaching this means
-		// downloads failed — which E3 reports as a per-submission error.
-		if downloaded < 2 {
-			log.Warn("too few sources to compare", "trace_id", decoded.TraceID, "data", map[string]any{
-				"analysis_problem_id": decoded.AnalysisProblemID,
-				"downloaded":          downloaded,
-			})
-			return nil
-		}
-
-		pairs, err := comparer.Compare(ctx, ws.Dir(), decoded.Language)
-		if err != nil {
-			log.Error("comparison failed", logger.Err(err), "trace_id", decoded.TraceID,
-				"data", map[string]any{"analysis_problem_id": decoded.AnalysisProblemID})
-			return err
-		}
-
-		log.Info("language group compared", "trace_id", decoded.TraceID, "data", map[string]any{
-			"analysis_problem_id":  decoded.AnalysisProblemID,
-			"language_group_index": decoded.LanguageGroupIndex,
-			"pairs":                len(pairs),
-			"duration_ms":          time.Since(started).Milliseconds(),
-		})
-
-		return nil
-	}
 }
