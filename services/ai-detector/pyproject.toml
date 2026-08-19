@@ -7,3 +7,14 @@ requires-python = ">=3.12"
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+
+[tool.pytest.ini_options]
+# The suite imports `src.*`, so the service directory is the import root.
+pythonpath = ["."]
+testpaths = ["tests"]
+markers = [
+    "slow: needs real model weights or a network download; excluded from the default loop",
+]
+# Slow tests are opt-in (`-m slow`): the fast loop must not pull a 500MB
+# checkpoint, per roadmap §10.
+addopts = "-m 'not slow'"
