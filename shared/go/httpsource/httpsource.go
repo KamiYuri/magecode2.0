@@ -1,13 +1,18 @@
-// Package downloader fetches submission sources from the pre-signed URLs the
-// job message carries.
+// Package httpsource fetches submission sources from the pre-signed URLs an
+// analysis job message carries.
 //
-// SIM holds no MinIO credentials (D-80/D-85): the URL is the whole of its
-// access, signed against the internal endpoint and valid for six hours. So
-// this is a plain HTTP GET with a retry budget, and its only real job is to
-// classify what went wrong — §2.5 asks services to retry transient failures
-// internally before reporting an error, and `shared/go/rmq` retries whatever
-// escapes classified as Transient.
-package downloader
+// The stateless batch workers hold no MinIO credentials (D-80/D-85): the URL
+// is the whole of their access, signed against the internal endpoint and valid
+// for six hours. So this is a plain HTTP GET with a retry budget, and its only
+// real job is to classify what went wrong — §2.5 asks services to retry
+// transient failures internally before reporting an error, and
+// `shared/go/rmq` retries whatever escapes classified as Transient.
+//
+// It lives here rather than in one service because SIM and VUL both need it
+// and the classification rules — a 4xx is an expired URL and is Permanent, a
+// 5xx is worth another try — are exactly the kind of thing that drifts when
+// it is written twice.
+package httpsource
 
 import (
 	"context"

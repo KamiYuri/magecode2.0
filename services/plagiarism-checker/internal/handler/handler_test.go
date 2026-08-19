@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/magecode/plagiarism-checker/internal/dolos"
-	"github.com/magecode/plagiarism-checker/internal/downloader"
+	"github.com/magecode/shared/go/httpsource"
 	"github.com/magecode/plagiarism-checker/internal/job"
 	"github.com/magecode/plagiarism-checker/internal/result"
 	"github.com/magecode/shared/go/apperror"
@@ -68,7 +68,7 @@ func (c *stubComparer) Compare(_ context.Context, dir string, _ job.Language) ([
 func testHandler(t *testing.T, publisher Publisher, comparer Comparer) *Handler {
 	t.Helper()
 	return New(Config{
-		Sources: downloader.New(downloader.Config{
+		Sources: httpsource.New(httpsource.Config{
 			MaxBytes: 64 * 1024, Attempts: 1, BaseDelay: time.Millisecond, Timeout: 2 * time.Second,
 		}),
 		Comparer:      comparer,

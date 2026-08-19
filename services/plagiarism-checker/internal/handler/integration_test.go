@@ -25,7 +25,7 @@ import (
 
 	amqp "github.com/rabbitmq/amqp091-go"
 
-	"github.com/magecode/plagiarism-checker/internal/downloader"
+	"github.com/magecode/shared/go/httpsource"
 	"github.com/magecode/plagiarism-checker/internal/handler"
 	"github.com/magecode/plagiarism-checker/internal/job"
 	"github.com/magecode/plagiarism-checker/internal/workspace"
@@ -108,7 +108,7 @@ func TestJobBecomesAWorkspaceAndIsCleanedUp(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = consumer.Close() })
 
-	client := downloader.New(downloader.Config{MaxBytes: 64 * 1024, Attempts: 2, BaseDelay: time.Millisecond})
+	client := httpsource.New(httpsource.Config{MaxBytes: 64 * 1024, Attempts: 2, BaseDelay: time.Millisecond})
 
 	go func() {
 		_ = consumer.Consume(ctx, queue, func(ctx context.Context, d rmq.Delivery) error {
