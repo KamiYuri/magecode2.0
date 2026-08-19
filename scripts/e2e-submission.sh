@@ -11,8 +11,8 @@
 # Override E2E_API_URL when Traefik cannot take port 80 — the api container
 # publishes no host port of its own, so the fallback is its address on the
 # compose network, where nginx listens on 9000:
-#   E2E_API_URL="http://$(docker inspect magecode-api \
-#     --format '{{.NetworkSettings.Networks.magecode-backend.IPAddress}}'):9000/api/v1"
+#   E2E_API_URL="http://$(docker inspect magecode-api --format \
+#     '{{index .NetworkSettings.Networks "magecode-backend" "IPAddress"}}'):9000/api/v1"
 #
 # What it needs running:
 #   docker compose up -d                          # postgres, rabbitmq, minio
