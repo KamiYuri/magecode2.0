@@ -20,6 +20,7 @@ services/api/.env
 
 # Vue
 services/web/node_modules/
+services/plagiarism-checker/reporter/node_modules/
 services/web/dist/
 
 # Go

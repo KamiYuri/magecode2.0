@@ -1,0 +1,40 @@
+{
+  "version": "1.0",
+  "language": "python",
+  "files": [
+    {
+      "path": "/probe/11.py"
+    },
+    {
+      "path": "/probe/12.py"
+    },
+    {
+      "path": "/probe/13.py"
+    }
+  ],
+  "pairs": [
+    {
+      "leftPath": "/probe/11.py",
+      "rightPath": "/probe/12.py",
+      "similarity": 1,
+      "longestFragment": 14,
+      "totalOverlap": 28,
+      "fragments": [
+        {
+          "left": {
+            "startRow": 0,
+            "startCol": 0,
+            "endRow": 7,
+            "endCol": 42
+          },
+          "right": {
+            "startRow": 0,
+            "startCol": 0,
+            "endRow": 7,
+            "endCol": 42
+          }
+        }
+      ]
+    }
+  ]
+}

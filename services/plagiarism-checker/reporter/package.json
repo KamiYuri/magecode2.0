@@ -1,0 +1,11 @@
+{
+  "name": "@magecode/sim-reporter",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Emits Dolos pairs with fragment coordinates as JSON for the SIM worker",
+  "main": "report.mjs",
+  "dependencies": {
+    "@dodona/dolos-lib": "3.5.1"
+  }
+}

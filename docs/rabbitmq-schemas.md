@@ -351,8 +351,8 @@ String enum values used in `service` field:
 | `pairs[].similarity` | number 0.0–1.0 | Yes | Similarity score |
 | `pairs[].longest_fragment` | integer or null | No | Longest matching fragment (tokens) |
 | `pairs[].total_overlap` | integer or null | No | Total overlapping tokens |
-| `pairs[].a_regions` | string or null | No | Highlight regions, pipe-separated |
-| `pairs[].b_regions` | string or null | No | Highlight regions, pipe-separated |
+| `pairs[].a_regions` | string or null | No | Highlight regions for A, pipe-separated (see below) |
+| `pairs[].b_regions` | string or null | No | Highlight regions for B, pipe-separated (see below) |
 | `submission_statuses` | array | Yes | Per-submission processing status |
 | `submission_statuses[].analysis_submission_id` | integer ≥ 1 | Yes | PK of `analysis_submissions` |
 | `submission_statuses[].status` | enum: `completed`, `error` | Yes | Per-submission outcome |
@@ -360,6 +360,15 @@ String enum values used in `service` field:
 | `trace_id` | UUID string | Yes | Echoed from job |
 | `timestamp` | ISO 8601 string | Yes | Publish time |
 | `version` | `"1.0"` | Yes | Schema version |
+
+**Region coordinates** (amended 2026-08-19, E2). One region is
+`startRow,startCol,endRow,endCol` and regions are joined with `|`. **Rows and columns are
+1-based**, matching the code viewer that renders them (`ui-ux-design.md` §4.5, F9). Dolos
+itself counts from 0; SIM converts once, on the way out, so the offset lives in one place
+with a test on it rather than in every consumer. A side with no matching fragments is
+`null`, never `""` — an empty string reads as a region. Each side's regions belong to its
+own submission, so normalising a pair to `submission_a_id < submission_b_id` swaps the two
+region strings with the two ids (both SIM and api do this; schema §5.5).
 
 #### 4.2.2. AID Result (`service: "ai-detector"`)
 
