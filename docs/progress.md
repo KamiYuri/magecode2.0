@@ -80,7 +80,7 @@ profile + notifications — and B10, which M5 owns, stay open.)
 
 | Task | Prio | Status | Ref | Notes |
 |---|---|---|---|---|
-| E1 sim skeleton + downloads | P0 | todo | — | — |
+| E1 sim skeleton + downloads | P0 | done | `sim/feat/skeleton-downloads` | Files are named `{submission_id}.{ext}` and `workspace.SubmissionIDFromPath` reads them back — that name is the **only** identity a file carries through Dolos, so E2 must not rename. One failed download costs its own submission, not the group (`handler.Fetch`) |
 | E2 dolos wrapper + parsing | P0 | todo | — | — |
 | E3 sim result assembly | P0 | todo | — | — |
 | E4 aid consumer | P0 | todo | — | — |
