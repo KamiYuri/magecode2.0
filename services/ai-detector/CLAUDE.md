@@ -6,8 +6,13 @@ Stateless batch worker (D-80: no DB access). Consumes `ai-detector` jobs
 scores AI-generation likelihood, publishes full results to `result-analysis`.
 
 ## Status
-E4 + E5 done: consumer, job decode, downloader, and the scorer. E6 (result publish)
-still to come.
+Plan E complete for AID (E4–E6): consumer, decode, downloader, scorer and the
+`result-analysis` message. Image and compose wiring belong to E8.
+
+**AID always answers.** A failure it can describe — an expired URL, a model that will not
+load, unreadable source — is published as `status: error` and acked, because api is waiting
+and a dead-letter costs the batch D-82's 30-minute timeout. Only an undecodable body (it
+names no `analysis_submission_id`) and an unreachable broker are not answered.
 
 ## Tech Stack
 Python 3.12, JSON logging to stdout (D-88), pika, requests. Model:
@@ -30,6 +35,8 @@ with a decimal point. The loader now refuses any checkpoint whose weights are mi
 - `src/downloader.py` — pre-signed URL GET with a retry budget; 4xx Permanent, 5xx Transient
 - `src/log.py` — the D-88 line shape, identical to `shared/go/logger`'s
 - `src/config.py` — fail-fast env loading, the Python half of `shared/go/config`
+- `src/result.py` — the `result.analysis.v1` AID branch, validated against the schema file
+- `src/handler.py` — per-job orchestration, the §2.5 retry budget and the always-answer rule
 - `src/model.py` — the pluggable scorer. A `*ForSequenceClassification` checkpoint is used
   as a detector; anything else is scored on **predictability** (mean masked-token negative
   log-likelihood, strided). The calibration constants are unfitted placeholders — they set

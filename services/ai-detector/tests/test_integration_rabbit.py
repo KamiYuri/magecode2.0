@@ -142,3 +142,101 @@ def test_a_transient_failure_lands_on_the_retry_queue(queue):
                                     arguments={"x-dead-letter-exchange": "",
                                                "x-dead-letter-routing-key": queue})
     assert state.method.message_count == 1
+
+
+def test_a_job_becomes_a_result_on_the_result_queue(queue):
+    """The whole loop against a real broker: job in, result out, message acked.
+
+    The detector is a stub — E5's real-weights suite covers the model, and
+    what is under test here is the plumbing between the two queues.
+    """
+    import http.server
+    import threading
+
+    from src.downloader import Downloader
+    from src.handler import Handler
+
+    source = b"print('hello')\n"
+
+    class Serve(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):  # noqa: N802 — BaseHTTPRequestHandler's spelling
+            self.send_response(200)
+            self.send_header("Content-Length", str(len(source)))
+            self.end_headers()
+            self.wfile.write(source)
+
+        def log_message(self, *_):  # keep the test output clean
+            return
+
+    server = http.server.HTTPServer(("127.0.0.1", 0), Serve)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+
+    results_queue = f"{queue}-results"
+    producer = channel()
+    declare_topology(producer, queue)
+    declare_topology(producer, results_queue)
+
+    trace = str(uuid.uuid4())
+    job = {
+        "analysis_submission_id": 501,
+        "submission_id": 42,
+        "file_url": f"http://127.0.0.1:{server.server_port}/main.py",
+        "language": "python",
+        "trace_id": trace,
+        "timestamp": "2026-08-19T09:30:00Z",
+        "version": "1.0",
+    }
+    publish(producer, queue, json.dumps(job).encode(), trace)
+
+    class StubDetector:
+        def score(self, text, language):
+            assert text == source.decode()
+            return 0.61
+
+    class SilentLogger:
+        def info(self, *_, **__): ...
+        def warning(self, *_, **__): ...
+        def error(self, *_, **__): ...
+
+    consumer = channel()
+    handler = Handler(
+        downloader=Downloader(),
+        detector=StubDetector(),
+        channel=consumer,
+        logger=SilentLogger(),
+        # A queue of this test's own: api's consumer would otherwise race it
+        # for the message once E8 puts that process in compose.
+        result_queue=results_queue,
+    )
+
+    handled = []
+
+    def handle(body, properties):
+        handler.handle(body, properties)
+        handled.append(body)
+
+    try:
+        consume(consumer, queue, handle, should_stop=lambda: bool(handled), inactivity_timeout=5)
+    finally:
+        server.shutdown()
+
+    inspector = channel()
+    method, properties, payload = inspector.basic_get(queue=results_queue, auto_ack=True)
+    assert method is not None, "no result was published"
+
+    message = json.loads(payload)
+    assert message["service"] == "ai-detector"
+    assert message["analysis_submission_id"] == 501
+    assert message["probability"] == 0.61
+    assert message["status"] == "completed"
+    assert properties.headers["trace_id"] == trace
+
+    # And the job is gone from its own queue.
+    state = channel().queue_declare(queue=queue, durable=True, passive=True)
+    assert state.method.message_count == 0
+
+    for name in (results_queue, f"{results_queue}.retry", f"{results_queue}.dlq"):
+        try:
+            channel().queue_delete(queue=name)
+        except Exception:  # noqa: BLE001 — cleanup is best effort
+            pass
