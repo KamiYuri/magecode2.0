@@ -108,5 +108,9 @@ type Consumer interface {
 	// at a time. On ctx cancellation it stops accepting new deliveries,
 	// lets in-flight handlers finish (D-73), and returns nil.
 	Consume(ctx context.Context, queue string, handler Handler) error
+	// Healthy reports whether the broker connection is currently usable.
+	// A consumer that has lost it still has a process, so compose needs to
+	// be able to ask (D-72).
+	Healthy() bool
 	io.Closer
 }

@@ -14,10 +14,11 @@ import (
 	"syscall"
 
 	"github.com/magecode/plagiarism-checker/internal/dolos"
-	"github.com/magecode/shared/go/httpsource"
 	"github.com/magecode/plagiarism-checker/internal/handler"
 	"github.com/magecode/plagiarism-checker/internal/job"
 	"github.com/magecode/shared/go/config"
+	"github.com/magecode/shared/go/health"
+	"github.com/magecode/shared/go/httpsource"
 	"github.com/magecode/shared/go/logger"
 	"github.com/magecode/shared/go/rmq"
 )
@@ -38,6 +39,9 @@ const (
 	// the point is to refuse something that is not a submission at all, not
 	// to re-enforce the API's limit.
 	defaultMaxSourceBytes = "1048576"
+	// defaultHealthAddr is where compose's healthcheck asks (D-72) and where
+	// G1 will hang /metrics.
+	defaultHealthAddr = ":9090"
 	// defaultWorkspaceRoot is tmpfs in compose, so the sources of a batch
 	// never touch a disk.
 	defaultWorkspaceRoot = "/tmp"
@@ -63,6 +67,7 @@ func main() {
 		"REPORTER_SCRIPT":      {Default: defaultReporterScript},
 		"NODE_BIN":             {Default: "node"},
 		"MAX_REGIONS_PER_PAIR": {Type: config.Int, Default: defaultMaxRegions},
+		"HEALTH_ADDR":          {Default: defaultHealthAddr},
 	})
 	if err != nil {
 		log.Error("loading config", logger.Err(err))
@@ -108,6 +113,16 @@ func main() {
 		WorkspaceRoot: cfg.String("WORKSPACE_ROOT"),
 		Log:           log,
 	})
+
+	// Readiness is the broker: a worker whose connection died still has a
+	// process, and without this the container looks fine while consuming
+	// nothing.
+	liveness := health.New(cfg.String("HEALTH_ADDR"), consumer.Healthy, log)
+	if err := liveness.Start(ctx); err != nil {
+		log.Error("starting health server", logger.Err(err))
+		os.Exit(1)
+	}
+	defer liveness.Stop()
 
 	log.Info("worker started", "data", map[string]any{
 		"queue":    serviceName,
