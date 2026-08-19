@@ -1,2 +1,7 @@
-# Runtime dependencies land with Plan E tasks (E4 pika, E5 transformers/torch).
-# Kept empty in the A7 scaffold so the image stays minimal.
+# Runtime dependencies for the ai-detector worker.
+pika==1.3.2
+requests==2.32.3
+# CodeBERT inference (E5). Torch is the CPU wheel; the image pins the index
+# so a CUDA build is never pulled onto a machine with no GPU.
+torch==2.5.1
+transformers==4.46.3

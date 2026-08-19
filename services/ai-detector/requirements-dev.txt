@@ -1,0 +1,8 @@
+# Test-only dependencies. Deliberately excludes torch/transformers: the unit
+# suite mocks the model and imports it lazily, so the fast loop needs neither
+# a 900MB wheel nor a model download. The slow suite (-m slow) runs in the
+# image, which has both.
+-r requirements-runtime-dev.txt
+pytest==8.3.4
+jsonschema==4.23.0
+ruff==0.8.4
