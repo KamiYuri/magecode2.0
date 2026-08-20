@@ -29,6 +29,11 @@ final class ConflictException extends ApiException
         return new self('DUPLICATE_SECTION_NAME', 'A section with this name already exists in this semester.');
     }
 
+    public static function duplicateTagName(): self
+    {
+        return new self('DUPLICATE_TAG_NAME', 'A tag with this name already exists in this course.');
+    }
+
     public static function lastAdmin(): self
     {
         return new self('LAST_ADMIN', 'The organization must keep at least one admin.');
