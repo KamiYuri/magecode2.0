@@ -260,7 +260,6 @@ services:
       DB_NAME: ${POSTGRES_DB}
       DB_USER: ${POSTGRES_USER}
       DB_PASSWORD: ${POSTGRES_PASSWORD}
-      DB_SIMPLE_PROTOCOL: "true"
       RABBITMQ_URL: "amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@rabbitmq:5672/${RABBITMQ_DEFAULT_VHOST}"
       MINIO_ENDPOINT: minio:9000
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
@@ -270,6 +269,7 @@ services:
       JUDGE0_URL: ${CES_JUDGE0_URL}
       JUDGE0_AUTH_TOKEN: ${CES_JUDGE0_AUTH_TOKEN}
       WORKER_COUNT: ${CES_WORKER_COUNT:-5}
+      HEALTH_ADDR: ":9090"
     tmpfs:
       - /tmp:size=128m
     networks:
@@ -280,6 +280,14 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+    # wget, not curl: this image is bare alpine (D-79a keeps CES under 30MB)
+    # and busybox already carries one.
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:9090/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
     restart: unless-stopped
     logging:
       <<: *loki-logging
