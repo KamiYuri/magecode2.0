@@ -202,3 +202,37 @@ def test_an_idle_tick_is_not_a_delivery():
     consume(channel, "ai-detector", lambda body, props: handled.append(body), should_stop=lambda: False)
 
     assert handled == [b"{}"]
+
+
+class BrokenPublishChannel(FakeChannel):
+    """A channel whose publish fails, as one does when the broker goes away
+    between taking a delivery and routing its failure."""
+
+    def basic_publish(self, exchange, routing_key, body, properties):
+        raise pika.exceptions.AMQPConnectionError("broker went away")
+
+    def basic_nack(self, delivery_tag, requeue=False):
+        self.nacked.append((delivery_tag, requeue))
+
+    def __init__(self, deliveries=None):
+        super().__init__(deliveries)
+        self.nacked: list[tuple[int, bool]] = []
+
+
+def test_a_failed_route_requeues_the_original_instead_of_crashing():
+    """`shared/go/rmq`'s handleDelivery catches a failed retry/DLQ republish
+    and Nacks the original with requeue, so the loop survives a broker that
+    disappears mid-route. This one let the exception escape `consume()`,
+    which takes the process down with it -- the redelivery still happens on
+    reconnect, but by way of a crash rather than a loop that keeps going."""
+    channel = BrokenPublishChannel([(Method(1), properties(), b"{}"), (None, None, None)])
+
+    consume(
+        channel,
+        "ai-detector",
+        handler=lambda body, props: (_ for _ in ()).throw(TransientError("model is away")),
+        should_stop=lambda: True,
+    )
+
+    assert channel.nacked == [(1, True)], "the original must go back to the broker"
+    assert channel.acked == [], "acking would drop a message that was never routed anywhere"

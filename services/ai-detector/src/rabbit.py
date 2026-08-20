@@ -162,17 +162,29 @@ def consume(channel, queue: str, handler: Callable[[bytes, Any], None],
         except BaseException as error:  # noqa: BLE001 — the routing decision is the point
             routing = route_failure(error, consumed, max_retries, base_delay_ms)
             target = dlq(queue) if routing.target == "dlq" else retry_queue(queue)
-            publish(
-                channel,
-                target,
-                body,
-                trace,
-                expiration_ms=routing.expiration_ms,
-                headers={
-                    HEADER_RETRY_COUNT: routing.retry_count,
-                    HEADER_LAST_ERROR: str(error)[:500],
-                },
-            )
+            try:
+                publish(
+                    channel,
+                    target,
+                    body,
+                    trace,
+                    expiration_ms=routing.expiration_ms,
+                    headers={
+                        HEADER_RETRY_COUNT: routing.retry_count,
+                        HEADER_LAST_ERROR: str(error)[:500],
+                    },
+                )
+            except BaseException:  # noqa: BLE001 — same reason as above
+                # The copy never landed, so the original is the only copy
+                # left: hand it back rather than acking it into nothing.
+                # `shared/go/rmq`'s handleDelivery does exactly this, and
+                # without it a broker that disappears mid-route takes the
+                # process down instead of the loop carrying on.
+                channel.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
+                if should_stop():
+                    break
+                continue
+
             if on_failure is not None:
                 on_failure(error, routing, trace)
 
