@@ -8,12 +8,16 @@ use App\Http\Controllers\AnalysisResultController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Auth\EmailVerificationController;
 use App\Http\Controllers\Auth\PasswordResetController;
+use App\Http\Controllers\AvatarStreamController;
 use App\Http\Controllers\CourseController;
 use App\Http\Controllers\HealthController;
 use App\Http\Controllers\MySectionController;
+use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\OrganizationAvatarController;
 use App\Http\Controllers\OrganizationController;
 use App\Http\Controllers\OrganizationMemberController;
 use App\Http\Controllers\ProblemController;
+use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProgrammingLanguageController;
 use App\Http\Controllers\SectionController;
 use App\Http\Controllers\SectionMemberController;
@@ -75,6 +79,31 @@ Route::prefix('v1')->group(function (): void {
         // Route parameters are named for implicit binding ({organization}),
         // while openapi.yml spells them {organization_id} — B11's conformance
         // test compares paths with the placeholder names normalised away.
+        // B12: the caller's own account. Nothing to authorise past the
+        // token -- every one of these is scoped to $request->user().
+        Route::get('profile', [ProfileController::class, 'show'])->name('profile.show');
+        Route::put('profile', [ProfileController::class, 'update'])->name('profile.update');
+        Route::put('profile/password', [ProfileController::class, 'updatePassword'])->name('profile.password');
+        Route::post('profile/avatar', [ProfileController::class, 'uploadAvatar'])
+            ->middleware('throttle:uploads')
+            ->name('profile.avatar.store');
+        Route::delete('profile/avatar', [ProfileController::class, 'deleteAvatar'])->name('profile.avatar.destroy');
+
+        // Streamed by api, never pre-signed (v3 §7): the bucket is not
+        // browser-reachable and a signed URL cannot be withdrawn inside its TTL.
+        Route::get('users/{user}/avatar', [AvatarStreamController::class, 'user'])->name('users.avatar');
+        Route::get('organizations/{organization}/avatar', [AvatarStreamController::class, 'organization'])
+            ->name('organizations.avatar');
+        Route::post('organizations/{organization}/avatar', [OrganizationAvatarController::class, 'store'])
+            ->middleware('throttle:uploads')
+            ->name('organizations.avatar.store');
+        Route::delete('organizations/{organization}/avatar', [OrganizationAvatarController::class, 'destroy'])
+            ->name('organizations.avatar.destroy');
+
+        Route::get('notifications', [NotificationController::class, 'index'])->name('notifications.index');
+        Route::post('notifications/mark-read', [NotificationController::class, 'markRead'])
+            ->name('notifications.mark-read');
+
         // B9: course-scoped tags (D-15). The listing and the writes sit on
         // different paths because a tag id is globally unique once it exists.
         Route::get('courses/{course}/tags', [TagController::class, 'index'])->name('tags.index');
