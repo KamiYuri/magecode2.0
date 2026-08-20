@@ -10,9 +10,11 @@ use App\Http\Controllers\Auth\EmailVerificationController;
 use App\Http\Controllers\Auth\PasswordResetController;
 use App\Http\Controllers\CourseController;
 use App\Http\Controllers\HealthController;
+use App\Http\Controllers\MySectionController;
 use App\Http\Controllers\OrganizationController;
 use App\Http\Controllers\OrganizationMemberController;
 use App\Http\Controllers\ProblemController;
+use App\Http\Controllers\ProgrammingLanguageController;
 use App\Http\Controllers\SectionController;
 use App\Http\Controllers\SectionMemberController;
 use App\Http\Controllers\SemesterController;
@@ -30,6 +32,13 @@ use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function (): void {
     Route::get('health', HealthController::class)->name('health');
+
+    // Unauthenticated per openapi (`security: []`): a reference list with
+    // nothing of anyone's in it, needed by screens drawn before a token
+    // exists. Still behind the global limiter, which keys on IP for guests.
+    Route::get('programming-languages', ProgrammingLanguageController::class)
+        ->middleware('throttle:api')
+        ->name('programming-languages.index');
 
     Route::prefix('auth')->group(function (): void {
         // Credential endpoints are the ones worth brute-forcing, so they get
@@ -65,6 +74,10 @@ Route::prefix('v1')->group(function (): void {
         // Route parameters are named for implicit binding ({organization}),
         // while openapi.yml spells them {organization_id} — B11's conformance
         // test compares paths with the placeholder names normalised away.
+        // The dashboard shortcut (D-09): one call gives F4's shell every
+        // section the caller belongs to, already grouped.
+        Route::get('me/sections', MySectionController::class)->name('me.sections');
+
         Route::get('admin/organizations', Admin\OrganizationController::class)->name('admin.organizations.index');
 
         Route::get('organizations', [OrganizationController::class, 'index'])->name('organizations.index');
