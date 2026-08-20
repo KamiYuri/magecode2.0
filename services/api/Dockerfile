@@ -25,7 +25,15 @@ FROM base AS vendor
 COPY composer.json composer.lock ./
 RUN composer install --no-dev --no-interaction --no-scripts --no-autoloader --prefer-dist
 COPY . .
-RUN composer dump-autoload --optimize --no-dev
+# `dump-autoload` fires `package:discover`, which boots the app, and booting it
+# registers `routes/channels.php` -- which instantiates the broadcaster. Since
+# E9 gave `config/broadcasting.php` a `reverb` default, that means Pusher's
+# constructor runs at build time and rejects a null key. Throwaway values get
+# it past discovery; they live only in this RUN and never reach the image,
+# which reads the real REVERB_* from the environment at container start. The
+# Makefile carries the same workaround for `artisan` outside Docker.
+RUN REVERB_APP_ID=build REVERB_APP_KEY=build REVERB_APP_SECRET=build \
+    composer dump-autoload --optimize --no-dev
 
 # ── Stage 3: application image shared by the runtime targets ──
 FROM base AS app
