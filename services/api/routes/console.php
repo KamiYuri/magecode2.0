@@ -11,13 +11,22 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 /*
-| D-82: every five minutes, end the batches nobody answered for.
+| Every five minutes, end the work nobody answered for. The `scheduler`
+| service in `docker-compose.yml` runs `schedule:work`, which is what fires
+| these in a deployment (added by E8; before that the api container was FPM
+| only and neither command ran outside development and tests).
 |
-| NOTE: no process in `docker-compose.yml` runs `schedule:run` — the api
-| container is nginx + FPM only — so this fires in development and in tests but
-| not yet in a deployment. A scheduler process belongs to E8/G-phase.
+| D-82 covers the batch. The submission sweeper is its counterpart, added
+| because a grading job that dead-letters -- or a publish the broker refused --
+| left a row unfinished for ever and a student's verdict strip waiting on an
+| `execution.completed` that was never coming (v3 §7, 2026-08-20).
 */
 Schedule::command('analysis:sweep-timeouts')
+    ->everyFiveMinutes()
+    ->withoutOverlapping()
+    ->runInBackground();
+
+Schedule::command('submissions:sweep-timeouts')
     ->everyFiveMinutes()
     ->withoutOverlapping()
     ->runInBackground();
