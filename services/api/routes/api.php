@@ -19,6 +19,7 @@ use App\Http\Controllers\SectionController;
 use App\Http\Controllers\SectionMemberController;
 use App\Http\Controllers\SemesterController;
 use App\Http\Controllers\SubmissionController;
+use App\Http\Controllers\TagController;
 use App\Http\Controllers\TestCaseController;
 use Illuminate\Broadcasting\BroadcastController;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
@@ -74,6 +75,13 @@ Route::prefix('v1')->group(function (): void {
         // Route parameters are named for implicit binding ({organization}),
         // while openapi.yml spells them {organization_id} — B11's conformance
         // test compares paths with the placeholder names normalised away.
+        // B9: course-scoped tags (D-15). The listing and the writes sit on
+        // different paths because a tag id is globally unique once it exists.
+        Route::get('courses/{course}/tags', [TagController::class, 'index'])->name('tags.index');
+        Route::post('courses/{course}/tags', [TagController::class, 'store'])->name('tags.store');
+        Route::put('tags/{tag}', [TagController::class, 'update'])->name('tags.update');
+        Route::delete('tags/{tag}', [TagController::class, 'destroy'])->name('tags.destroy');
+
         // The dashboard shortcut (D-09): one call gives F4's shell every
         // section the caller belongs to, already grouped.
         Route::get('me/sections', MySectionController::class)->name('me.sections');
