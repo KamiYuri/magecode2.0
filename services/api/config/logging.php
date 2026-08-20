@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Logging\JsonFormatter;
 use Monolog\Handler\NullHandler;
 use Monolog\Handler\StreamHandler;
 use Monolog\Handler\SyslogUdpHandler;
@@ -20,7 +21,20 @@ return [
     |
     */
 
-    'default' => env('LOG_CHANNEL', 'stack'),
+    'default' => env('LOG_CHANNEL', 'stdout'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Service Name (D-88)
+    |--------------------------------------------------------------------------
+    |
+    | The `service` field of every log line. One image runs api, reverb, the
+    | scheduler and both AMQP consumers, and this field is all Loki has to tell
+    | them apart -- the Go workers each name themselves the same way.
+    |
+    */
+
+    'service' => env('LOG_SERVICE', 'api'),
 
     /*
     |--------------------------------------------------------------------------
@@ -58,6 +72,20 @@ return [
             'driver' => 'stack',
             'channels' => explode(',', (string) env('LOG_STACK', 'single')),
             'ignore_exceptions' => false,
+        ],
+
+        /*
+         * D-88: JSON to stdout, collected by the Docker Loki driver. The
+         * driver only ever sees stdout/stderr, so a file channel here is a
+         * log the observability stack cannot read.
+         */
+        'stdout' => [
+            'driver' => 'monolog',
+            'handler' => StreamHandler::class,
+            'handler_with' => ['stream' => 'php://stdout'],
+            'formatter' => JsonFormatter::class,
+            'level' => env('LOG_LEVEL', 'info'),
+            'processors' => [PsrLogMessageProcessor::class],
         ],
 
         'single' => [

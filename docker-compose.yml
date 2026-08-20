@@ -45,6 +45,9 @@ services:
       APP_KEY: ${APP_KEY}
       APP_DEBUG: ${APP_DEBUG:-true}
       APP_URL: ${APP_URL}
+      # D-88: JSON to stdout under this name, which is how Loki tells the
+      # processes sharing this image apart.
+      LOG_SERVICE: api
       DB_CONNECTION: pgsql
       DB_HOST: pgbouncer
       DB_PORT: ${PGBOUNCER_PORT}
@@ -135,6 +138,7 @@ services:
       <<: *common-env
       APP_ENV: ${APP_ENV}
       APP_KEY: ${APP_KEY}
+      LOG_SERVICE: reverb
       DB_CONNECTION: pgsql
       DB_HOST: pgbouncer
       DB_PORT: ${PGBOUNCER_PORT}
@@ -181,6 +185,7 @@ services:
       APP_KEY: ${APP_KEY}
       APP_DEBUG: ${APP_DEBUG:-true}
       APP_URL: ${APP_URL}
+      LOG_SERVICE: amqp-execution-consumer
       DB_CONNECTION: pgsql
       DB_HOST: pgbouncer
       DB_PORT: ${PGBOUNCER_PORT}
@@ -227,6 +232,7 @@ services:
     command: ["php", "artisan", "amqp:consume-analysis"]
     environment:
       <<: *api-worker-env
+      LOG_SERVICE: amqp-analysis-consumer
 
   scheduler:
     <<: *api-worker
@@ -237,6 +243,7 @@ services:
     command: ["php", "artisan", "schedule:work"]
     environment:
       <<: *api-worker-env
+      LOG_SERVICE: scheduler
 
   code-executor:
     profiles: ["app", "full"]
