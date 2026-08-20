@@ -9,6 +9,7 @@ use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Auth\EmailVerificationController;
 use App\Http\Controllers\Auth\PasswordResetController;
 use App\Http\Controllers\AvatarStreamController;
+use App\Http\Controllers\BankProblemController;
 use App\Http\Controllers\CourseController;
 use App\Http\Controllers\HealthController;
 use App\Http\Controllers\MySectionController;
@@ -16,6 +17,7 @@ use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OrganizationAvatarController;
 use App\Http\Controllers\OrganizationController;
 use App\Http\Controllers\OrganizationMemberController;
+use App\Http\Controllers\ProblemCloneController;
 use App\Http\Controllers\ProblemController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProgrammingLanguageController;
@@ -79,6 +81,24 @@ Route::prefix('v1')->group(function (): void {
         // Route parameters are named for implicit binding ({organization}),
         // while openapi.yml spells them {organization_id} — B11's conformance
         // test compares paths with the placeholder names normalised away.
+        // B10: the course-scoped problem bank (D-25, D-63–D-66).
+        Route::get('courses/{course}/bank', [BankProblemController::class, 'index'])->name('bank.index');
+        Route::post('courses/{course}/bank', [BankProblemController::class, 'store'])->name('bank.store');
+        Route::post('courses/{course}/bank/publish', [BankProblemController::class, 'publish'])
+            ->name('bank.publish');
+        Route::get('bank-problems/{bankProblem}', [BankProblemController::class, 'show'])->name('bank.show');
+        Route::put('bank-problems/{bankProblem}', [BankProblemController::class, 'update'])->name('bank.update');
+        Route::delete('bank-problems/{bankProblem}', [BankProblemController::class, 'destroy'])
+            ->name('bank.destroy');
+        Route::patch('bank-problems/{bankProblem}/approve', [BankProblemController::class, 'approve'])
+            ->name('bank.approve');
+        Route::get('bank-problems/{bankProblem}/versions', [BankProblemController::class, 'versions'])
+            ->name('bank.versions');
+
+        // D-65's deep copy, which B8 deliberately left for this task.
+        Route::post('sections/{section}/problems/clone', ProblemCloneController::class)
+            ->name('problems.clone');
+
         // B12: the caller's own account. Nothing to authorise past the
         // token -- every one of these is scoped to $request->user().
         Route::get('profile', [ProfileController::class, 'show'])->name('profile.show');
