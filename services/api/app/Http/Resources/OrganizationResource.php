@@ -26,7 +26,9 @@ class OrganizationResource extends JsonResource
             'name' => $this->name,
             'description' => $this->description,
             'email' => $this->email,
-            'avatar_url' => null,
+            'avatar_url' => $this->avatar_path === null
+                ? null
+                : route('organizations.avatar', ['organization' => $this->id]),
             'creator' => new UserSummaryResource($this->whenLoaded('creator')),
             'my_role' => $this->my_role,
             'members_count' => $this->whenCounted('members'),

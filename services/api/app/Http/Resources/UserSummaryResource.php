@@ -27,7 +27,7 @@ class UserSummaryResource extends JsonResource
             'first_name' => $this->first_name,
             'last_name' => $this->last_name,
             'student_id' => $this->student_id,
-            'avatar_url' => null,
+            'avatar_url' => UserResource::avatarUrl($this->resource),
         ];
     }
 }
