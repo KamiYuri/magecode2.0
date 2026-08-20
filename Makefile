@@ -113,8 +113,12 @@ build-workers:
 
 # ── Database ──
 # Run through the api image against PgBouncer: the host PHP has no pdo_pgsql.
+# REVERB_TEST_ENV for the same reason API_RUN carries it: registering a channel
+# instantiates the broadcaster, so artisan cannot boot at all once
+# routes/channels.php exists -- migrate/seed/fresh died on Pusher's constructor
+# rather than on anything to do with the database.
 DB_RUN = docker run --rm --network magecode-backend -v $(PWD)/services/api:/var/www/html \
-	-e DB_HOST=pgbouncer -e DB_PORT=6432 magecode-api:test
+	-e DB_HOST=pgbouncer -e DB_PORT=6432 $(REVERB_TEST_ENV) magecode-api:test
 
 migrate: api-image
 	$(DB_RUN) php artisan migrate --force
