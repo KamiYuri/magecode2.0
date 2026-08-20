@@ -6,11 +6,17 @@ reads test cases from PostgreSQL (direct DB access per D-81), runs code via Judg
 streams per-test-case results to the DB and signals api through `result-execution`.
 
 ## Status
-Through C4: the consumer loop and its failure semantics. `internal/job` decodes
-`job.code-executor.v1` strictly — an unknown field or an unusable id is a **Permanent**
-error, so it dead-letters instead of burning the retry budget. The handler itself is a
-stub; C5 (repository) and C6 (Judge0 client) fill it in and **must classify their own
-errors**, because a bare error is treated as transient and retried three times.
+Through C7: the consumer loop, the repository, the Judge0 client and result signalling.
+`internal/job` decodes `job.code-executor.v1` strictly — an unknown field or an unusable id is a
+**Permanent** error, so it dead-letters instead of burning the retry budget. C5 (repository) and
+C6 (Judge0 client) **classify their own errors**, because a bare error is treated as transient
+and retried three times.
+
+C8 (the submit-to-verdict gate) stays blocked on the host: Judge0 CE needs cgroup v1 and this
+machine runs v2 (D-90). The code is done; the matrix is unrun.
+
+The pre-M4 cleanup added `/healthz` via `shared/go/health` — E8 gave the three batch workers a
+health endpoint and left CES as the only queue consumer compose could not ask (D-72).
 
 ## Tech Stack
 Go 1.26+, shared packages from `shared/go` (logger, config, apperror, rmq, db, storage).
@@ -34,9 +40,10 @@ Go 1.26+, shared packages from `shared/go` (logger, config, apperror, rmq, db, s
 | `DB_HOST` | yes | — | PgBouncer, never Postgres directly (D-89) |
 | `DB_PORT` | no | 6432 | PgBouncer's port |
 | `DB_NAME` / `DB_USER` / `DB_PASSWORD` | yes | — | credentials, escaped into the DSN |
-
-MinIO/Judge0 vars arrive with C6. Note `DB_SIMPLE_PROTOCOL` in compose controls nothing —
-`shared/go/db` enforces the simple protocol unconditionally.
+| `MINIO_*` | yes | — | CES reads objects directly; pre-signed URLs are the batch workers' (D-85) |
+| `JUDGE0_URL` / `JUDGE0_AUTH_TOKEN` | yes | — | Judge0 CE, on the `judge0-link` network |
+| `JUDGE0_TIMEOUT` | no | 60s | bounds one call; must exceed any problem's own time limit |
+| `HEALTH_ADDR` | no | :9090 | D-72 liveness. Spelled out: an empty address takes a random port |
 
 ## Testing
 ```bash

@@ -501,8 +501,11 @@ THEN (for all services):
    e. Check if ALL analysis_submissions completed for this analysis_problem
    f. If yes → mark analysis_problem.status = 'completed', completed_at = now()
    g. Push WebSocket to GV:
-      - Channel: private-analysis.{analysis_problem_id}
-      - Event: analysis.updated (partial) or analysis.completed (all done)
+      - Channel: private-section.{section_id}, one frame per section in the
+        batch's scope -- a batch is semester-wide, so it has no single
+        analysis channel to speak on (D6)
+      - Event: analysis.progress (per newly completed submission) or
+        analysis.completed (batch closed, with `status` carrying the ending)
    h. Ack message
 ```
 
