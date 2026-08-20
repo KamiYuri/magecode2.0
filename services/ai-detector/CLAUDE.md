@@ -7,7 +7,8 @@ scores AI-generation likelihood, publishes full results to `result-analysis`.
 
 ## Status
 Plan E complete for AID (E4–E6): consumer, decode, downloader, scorer and the
-`result-analysis` message. Image and compose wiring belong to E8.
+`result-analysis` message. E8 built the image and wired it into compose; E9 drove the whole
+pipeline end to end and M3 passed.
 
 **AID always answers.** A failure it can describe — an expired URL, a model that will not
 load, unreadable source — is published as `status: error` and acked, because api is waiting

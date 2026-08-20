@@ -7,7 +7,8 @@ findings to `result-analysis`.
 
 ## Status
 E7 done: job decode, CodeQL wrapper for python/java/cpp, SARIF parsing and the
-`result-analysis` message. Image and compose wiring belong to E8.
+`result-analysis` message. E8 built the image and wired it into compose; E9 drove the whole
+pipeline end to end and M3 passed.
 
 **VUL always answers.** A failure it can describe — an expired URL, a scan that timed out,
 a language with no suite — is published as `status: error` (or `not_applicable`) and acked,

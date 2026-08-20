@@ -7,7 +7,8 @@ runs Dolos similarity analysis, publishes full results to `result-analysis`.
 
 ## Status
 Plan E complete for SIM (E1–E3): job decode, downloads, Dolos comparison and the
-`result-analysis` message. Images and compose wiring belong to E8.
+`result-analysis` message. E8 built the image and wired it into compose; E9 drove the whole
+pipeline end to end and M3 passed.
 
 **The rule this service follows is that SIM always answers.** A failure it can describe —
 an unreadable source, a comparison that timed out — is published as `status: error` and

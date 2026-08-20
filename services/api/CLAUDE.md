@@ -6,12 +6,19 @@ Single writer to PostgreSQL in the batch path (D-80) and the only service expose
 through Traefik (D-86).
 
 ## Status
-Through D8 — **Plan D complete**: everything of M1 (auth, RBAC, entity CRUD, roster, problems), the submission
-endpoints and their MinIO storage, the AMQP publisher and the execution-result consumer, and
+**M3 passed** (E9, 2026-08-19): everything of M1 (auth, RBAC, entity CRUD, roster, problems), the
+submission endpoints and their MinIO storage, the AMQP publisher and both result consumers, and
 Plan D's trigger, SIM/AID/VUL job publishing, `result-analysis` ingestion, batch completion with
-its Reverb frames, the D-82 timeout sweeper and the two-tier analysis read APIs.
-Next: Plan E (the workers) is what M3's gate now waits on. Open from M1: B9 tags, B10 problem
-bank, B12 profile + notifications.
+its Reverb frames, the D-82 timeout sweeper and the two-tier analysis read APIs. M4 (the Vue
+frontend) is next; M2's gate stays blocked on the host's cgroup version (D-90), not on code.
+
+Open from M1: B9 tags, B10 problem bank, B12 profile + notifications.
+
+Landed in the pre-M4 cleanup, and worth knowing before you touch the surrounding code:
+`config/logging.php` now has a `stdout` channel (D-88 — application logs reached no one before
+it); `AmqpConsumerLoop` is the one consume loop behind both `amqp:consume-*` commands, with
+reconnect and D-79e retry/DLQ routing; and `submissions:sweep-timeouts` ends a submission whose
+grading job never came back.
 
 **Adding an endpoint?** `tests/Feature/Contract/RouteConformanceTest.php` fails until the
 route matches openapi.yml — strike your operation from its `PENDING` list in the same commit.
