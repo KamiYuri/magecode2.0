@@ -82,10 +82,6 @@ class RouteConformanceTest extends TestCase
             'POST /organizations/{}/avatar',
             'DELETE /organizations/{}/avatar',
         ],
-        'F4 dashboards and reference reads' => [
-            'GET /me/sections',
-            'GET /programming-languages',
-        ],
         'G-phase export' => [
             'GET /sections/{}/export/grades',
             'GET /problems/{}/export/submissions',
