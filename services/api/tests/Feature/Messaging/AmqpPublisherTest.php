@@ -45,19 +45,37 @@ class AmqpPublisherTest extends TestCase
 
     protected function tearDown(): void
     {
-        if ($this->inspector !== null) {
-            $channel = $this->inspector->channel();
+        // Independent of whether this test ever opened the inspector. Two of
+        // the cases here publish through their own connection and never touch
+        // it, so gating the cleanup on it left their three durable queues
+        // behind on every run -- two dozen of them had accumulated on the
+        // development broker, each holding a message, until `rabbitmqctl
+        // list_queues` took longer than its own 60-second timeout.
+        if (isset($this->config)) {
+            $channel = $this->connection()->channel();
 
             foreach ([$this->queue, $this->queue.'.retry', $this->queue.'.dlq'] as $queue) {
                 $channel->queue_delete($queue);
             }
 
             $channel->close();
-            $this->inspector->close();
+            $this->inspector?->close();
             $this->inspector = null;
         }
 
         parent::tearDown();
+    }
+
+    /** Lazily opened, and reused by tearDown so cleanup never needs its own. */
+    private function connection(): AMQPStreamConnection
+    {
+        return $this->inspector ??= new AMQPStreamConnection(
+            (string) $this->config['host'],
+            (int) $this->config['port'],
+            (string) $this->config['user'],
+            (string) $this->config['password'],
+            (string) $this->config['vhost'],
+        );
     }
 
     public function test_a_published_job_arrives_intact(): void
@@ -171,14 +189,6 @@ class AmqpPublisherTest extends TestCase
 
     private function inspectorChannel(): AMQPChannel
     {
-        $this->inspector ??= new AMQPStreamConnection(
-            (string) $this->config['host'],
-            (int) $this->config['port'],
-            (string) $this->config['user'],
-            (string) $this->config['password'],
-            (string) $this->config['vhost'],
-        );
-
-        return $this->inspector->channel();
+        return $this->connection()->channel();
     }
 }
