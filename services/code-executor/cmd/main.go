@@ -20,6 +20,7 @@ import (
 	"github.com/magecode/code-executor/internal/repository"
 	"github.com/magecode/shared/go/config"
 	"github.com/magecode/shared/go/db"
+	"github.com/magecode/shared/go/health"
 	"github.com/magecode/shared/go/logger"
 	"github.com/magecode/shared/go/rmq"
 	"github.com/magecode/shared/go/storage"
@@ -40,6 +41,11 @@ const (
 	// defaultJudge0Timeout comfortably exceeds the 30s ceiling openapi puts on
 	// a problem's time_limit, plus Judge0's own queueing.
 	defaultJudge0Timeout = "60s"
+	// defaultHealthAddr is where compose's healthcheck asks (D-72) and where
+	// G1 will hang /metrics. Spelled out rather than left empty: E9 found that
+	// net.Listen("tcp", "") takes a random free port, which answers nothing
+	// the healthcheck asks for.
+	defaultHealthAddr = ":9090"
 )
 
 func main() {
@@ -69,6 +75,8 @@ func main() {
 		// limit (30s ceiling per openapi) or CES would abandon a program
 		// Judge0 is still legitimately running.
 		"JUDGE0_TIMEOUT": {Type: config.Duration, Default: defaultJudge0Timeout},
+
+		"HEALTH_ADDR": {Default: defaultHealthAddr},
 	})
 	if err != nil {
 		log.Error("loading config", logger.Err(err))
@@ -125,6 +133,17 @@ func main() {
 		os.Exit(1)
 	}
 	defer consumer.Close()
+
+	// Readiness is the broker: a worker whose connection died still has a
+	// process, and without this the container looks fine while consuming
+	// nothing. E8 gave the three batch workers this and CES was left out --
+	// it was the only queue consumer compose could not ask (D-72).
+	liveness := health.New(cfg.String("HEALTH_ADDR"), consumer.Healthy, log)
+	if err := liveness.Start(ctx); err != nil {
+		log.Error("starting health server", logger.Err(err))
+		os.Exit(1)
+	}
+	defer liveness.Stop()
 
 	log.Info("worker started", "data", map[string]any{
 		"queue":    serviceName,
